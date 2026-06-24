@@ -387,7 +387,7 @@ body.bonus-mode .die-slot.empty {
     ③ 알까기 발동 시 → 추천 결과에서 <strong>알까기 발동</strong> 버튼 클릭 → 보너스 주사위 배치<br>
     <br>
     <strong>보너스 계산</strong> &nbsp;더블: 같은 눈 2개 → ×3 &nbsp;|&nbsp; 트리플: 같은 눈 3개 → ×5<br>
-    <strong>알까기</strong> &nbsp;내 주사위 값 = 상대 필드 값이면 발동 — 상대 <strong>전체 필드</strong>의 같은 눈(실드 제외) 모두 제거 + 보너스 실드 주사위 (내/상대 필드 모두 배치 가능)
+    <strong>알까기</strong> &nbsp;내 N번 줄에 배치 시 상대 N번 줄에 같은 눈이 있으면 발동 (내 N번 줄 꽉 차면 불가) — 해당 줄 상대 주사위(실드 제외) 전부 제거 + 보너스 실드 주사위 (양 필드 배치 가능)
   </div>
 
 </div>
@@ -452,82 +452,77 @@ function maxRowScore(dice) {
 }
 
 // ─── RECOMMENDATION ENGINE ────────────────────────────────────────────────
-// 알까기는 글로벌 효과: 상대 필드 전체에서 같은 눈(실드 제외) 모두 제거
-// 발동 조건: 상대 어느 줄이든 해당 값 존재 + 내 필드 어느 줄이든 빈 슬롯 존재
+// 알까기는 줄별(row-specific): 내 N번 줄에 배치해야 상대 N번 줄 알까기 발동
+// 조건: 내 N번 줄에 빈 슬롯 있어야 배치 가능 → 내 N번 줄 꽉 차면 해당 줄 알까기 불가
 function getRecommendations(dieValue) {
-  const playerHasSpace = state.playerRows.some(r => r.length < 3);
   const options = [];
 
-  // ── 알까기 글로벌 체크 ──
-  const oppMatchCount = state.opponentRows.reduce((sum, row) =>
-    sum + row.filter(d => d.value === dieValue && !d.shield).length, 0);
-
-  if (oppMatchCount > 0 && playerHasSpace) {
-    const simOpp = state.opponentRows.map(row =>
-      row.filter(d => !(d.value === dieValue && !d.shield))
-    );
-    let totalOppLoss = 0;
-    for (let i = 0; i < 3; i++) {
-      totalOppLoss += rowScore(state.opponentRows[i]) - rowScore(simOpp[i]);
-    }
-    let winsAfter = 0;
-    for (let i = 0; i < 3; i++) {
-      if (rowScore(state.playerRows[i]) > rowScore(simOpp[i])) winsAfter++;
-    }
-
-    const expectedBonus = 3.5;
-    const totalBenefit  = totalOppLoss + expectedBonus;
-    let heuristic = totalBenefit * 2.5 + winsAfter * 8;
-    if (oppMatchCount >= 2) heuristic += 28;
-    if (oppMatchCount >= 3) heuristic += 20;
-
-    const rowBreakdown = [0, 1, 2].map(r => ({
-      r,
-      removed: state.opponentRows[r].filter(d => d.value === dieValue && !d.shield).length,
-      oppLoss: rowScore(state.opponentRows[r]) - rowScore(simOpp[r]),
-    })).filter(x => x.removed > 0);
-
-    options.push({ type: 'alkkagi', removedCount: oppMatchCount, totalOppLoss, totalBenefit, winsAfter, heuristic, rowBreakdown });
-  }
-
-  // ── 줄별 직접 배치 ──
   for (let r = 0; r < 3; r++) {
     const pRow = state.playerRows[r];
 
+    // 내 줄이 꽉 차면 알까기/배치 모두 불가
     if (pRow.length >= 3) {
       options.push({ row: r, type: 'full', heuristic: -999 });
       continue;
     }
 
-    const newDice   = [...pRow, { value: dieValue, shield: false }];
-    const newScore  = rowScore(newDice);
-    const gain      = newScore - rowScore(pRow);
-    const oScore    = rowScore(state.opponentRows[r]);
-    const diff      = newScore - oScore;
-    const sameCount = newDice.filter(d => d.value === dieValue).length;
+    // 상대 같은 줄에 해당 값이 있으면 알까기 발동 가능
+    const oppMatchingDice = state.opponentRows[r].filter(d => d.value === dieValue && !d.shield);
 
-    let wins = 0;
-    for (let i = 0; i < 3; i++) {
-      const ps = i === r ? newScore : rowScore(state.playerRows[i]);
-      if (ps > rowScore(state.opponentRows[i])) wins++;
+    if (oppMatchingDice.length > 0) {
+      // ── 알까기 옵션 ──
+      const oldOppScore  = rowScore(state.opponentRows[r]);
+      const newOppRow    = state.opponentRows[r].filter(d => !(d.value === dieValue && !d.shield));
+      const newOppScore  = rowScore(newOppRow);
+      const oppLoss      = oldOppScore - newOppScore;
+      const removedCount = oppMatchingDice.length;
+      const expectedBonus = 3.5;
+
+      const simOpp = state.opponentRows.map((row, i) => i === r ? newOppRow : row);
+      let winsAfter = 0;
+      for (let i = 0; i < 3; i++) {
+        if (rowScore(state.playerRows[i]) > rowScore(simOpp[i])) winsAfter++;
+      }
+
+      const totalBenefit = oppLoss + expectedBonus;
+      let heuristic = totalBenefit * 2.5 + winsAfter * 8;
+      if (removedCount >= 2) heuristic += 28;
+      if (rowScore(state.playerRows[r]) > newOppScore) heuristic += 12;
+
+      options.push({ row: r, type: 'alkkagi', oppLoss, removedCount, newOppScore, totalBenefit, winsAfter, heuristic });
+
+    } else {
+      // ── 직접 배치 옵션 ──
+      const newDice   = [...pRow, { value: dieValue, shield: false }];
+      const newScore  = rowScore(newDice);
+      const gain      = newScore - rowScore(pRow);
+      const oScore    = rowScore(state.opponentRows[r]);
+      const diff      = newScore - oScore;
+      const sameCount = newDice.filter(d => d.value === dieValue).length;
+
+      let wins = 0;
+      for (let i = 0; i < 3; i++) {
+        const ps = i === r ? newScore : rowScore(state.playerRows[i]);
+        if (ps > rowScore(state.opponentRows[i])) wins++;
+      }
+
+      let heuristic = gain * 2;
+      if (sameCount === 3) heuristic += 35;
+      else if (sameCount === 2) heuristic += 15;
+      if (diff > 0) heuristic += 18;
+      else if (diff === 0) heuristic += 4;
+      heuristic += wins * 7;
+      if (state.opponentRows[r].length === 3 && oScore >= maxRowScore(newDice)) heuristic -= 20;
+
+      let bonus = '';
+      if (sameCount === 3)           bonus = '🔥 트리플 완성!';
+      else if (sameCount === 2)      bonus = '✨ 더블 완성';
+      else if (diff > 0)             bonus = '우세 확보';
+      else if (diff === 0 && oScore) bonus = '동점';
+      else if (gain > 0)             bonus = `+${gain}점`;
+
+      options.push({ row: r, type: 'normal', gain, newScore, oScore, diff, wins, heuristic, bonus, sameCount });
     }
-
-    let heuristic = gain * 2;
-    if (sameCount === 3) heuristic += 35;
-    else if (sameCount === 2) heuristic += 15;
-    if (diff > 0) heuristic += 18;
-    else if (diff === 0) heuristic += 4;
-    heuristic += wins * 7;
-    if (state.opponentRows[r].length === 3 && oScore >= maxRowScore(newDice)) heuristic -= 20;
-
-    let bonus = '';
-    if (sameCount === 3)           bonus = '🔥 트리플 완성!';
-    else if (sameCount === 2)      bonus = '✨ 더블 완성';
-    else if (diff > 0)             bonus = '우세 확보';
-    else if (diff === 0 && oScore) bonus = '동점';
-    else if (gain > 0)             bonus = `+${gain}점`;
-
-    options.push({ row: r, type: 'normal', gain, newScore, oScore, diff, wins, heuristic, bonus, sameCount });
   }
 
   options.sort((a, b) => b.heuristic - a.heuristic);
@@ -549,18 +544,15 @@ function renderBoard() {
     const ps = rowScore(state.playerRows[r]);
     const os = rowScore(state.opponentRows[r]);
     const isRec = state.recommendedRow === r;
-    // 글로벌 알까기 하이라이트: 상대 어느 줄이든 매칭 + 내 필드 공간 있을 때
-    const globalAlkOk = state.selectedDie !== null &&
-      state.opponentRows.some(row => row.some(d => d.value === state.selectedDie && !d.shield)) &&
-      state.playerRows.some(x => x.length < 3);
-    // 이 줄의 상대 주사위가 제거 대상이면 오렌지 하이라이트
-    const alkHighlight = globalAlkOk &&
+    // 줄별 알까기 하이라이트: 내 이 줄에 빈 슬롯 있고 + 상대 같은 줄에 해당 값 있을 때
+    const alkHighlight = state.selectedDie !== null &&
+      state.playerRows[r].length < 3 &&
       state.opponentRows[r].some(d => d.value === state.selectedDie && !d.shield);
 
     const card = document.createElement('div');
     let cardClass = 'row-card';
-    if (alkHighlight)  cardClass += ' alkkagi-row';
-    else if (isRec)    cardClass += ' rec-row';
+    if (isRec && !alkHighlight) cardClass += ' rec-row';
+    if (alkHighlight)           cardClass += ' alkkagi-row';
     card.className = cardClass;
 
     // Player (left)
@@ -645,6 +637,10 @@ function makeSlot(side, row, slotIdx) {
 
       rows[row].push({ value: state.selectedDie, shield: state.isShield });
       state.recommendedRow = null;
+      // 배치 후 추천 패널 초기화 (이전 추천이 stale하게 남는 버그 방지)
+      document.getElementById('recPanel').className = 'rec-panel';
+      document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+      document.getElementById('recOptions').innerHTML = '';
       render();
     });
   }
@@ -926,14 +922,12 @@ function toggleShield() {
 }
 
 // ─── ALKKAGI ─────────────────────────────────────────────────────────────
-function triggerAlkkagi() {
+function triggerAlkkagi(rowIdx) {
   const v = state.selectedDie;
   if (v === null) { alert('주사위 값을 선택하세요!'); return; }
 
-  // 글로벌: 상대 전체 필드에서 같은 눈(실드 제외) 모두 제거
-  for (let r = 0; r < 3; r++) {
-    state.opponentRows[r] = state.opponentRows[r].filter(d => !(d.value === v && !d.shield));
-  }
+  // 줄별: 해당 줄(rowIdx)의 상대 주사위만 제거
+  state.opponentRows[rowIdx] = state.opponentRows[rowIdx].filter(d => !(d.value === v && !d.shield));
 
   state.alkkagiBonus = true;
   document.body.classList.add('bonus-mode');
@@ -981,16 +975,14 @@ function doRecommend() {
 
   const best       = valid[0];
   const hasAlkkagi = valid.some(o => o.type === 'alkkagi');
-  // recommendedRow: 직접 배치 시만 줄 하이라이트 (알까기는 상대 줄을 alkHighlight로 표시)
-  state.recommendedRow = (best.type === 'normal') ? best.row : null;
+  state.recommendedRow = best.row;
 
   panel.className = 'rec-panel has-rec' + (hasAlkkagi ? ' has-alkkagi' : '');
 
   const ROWS = ['1번 줄', '2번 줄', '3번 줄'];
 
   if (hasAlkkagi && best.type === 'alkkagi') {
-    const affected = best.rowBreakdown.map(x => ROWS[x.r]).join(', ');
-    main.innerHTML = `<span class="alk-hl">⚡ 알까기</span>가 최선입니다 — 상대 ${affected} 제거`;
+    main.innerHTML = `<span class="alk-hl">⚡ ${ROWS[best.row]} 알까기</span>가 최선입니다`;
   } else if (hasAlkkagi) {
     main.innerHTML = `<span class="row-hl">${ROWS[best.row]}</span> 직접 배치가 최선 (알까기 가능하지만 불리)`;
   } else {
@@ -1008,16 +1000,15 @@ function doRecommend() {
     const nameEl = document.createElement('div');
     nameEl.className = 'opt-row-name';
 
+    const rowSpan = document.createElement('span');
+    rowSpan.textContent = ROWS[opt.row];
+    nameEl.appendChild(rowSpan);
+
     if (opt.type === 'alkkagi') {
-      nameEl.innerHTML = '전체 알까기 &nbsp;';
       const tag = document.createElement('span');
       tag.className = 'alk-tag';
       tag.textContent = '⚡ 알까기';
       nameEl.appendChild(tag);
-    } else {
-      const rowSpan = document.createElement('span');
-      rowSpan.textContent = ROWS[opt.row];
-      nameEl.appendChild(rowSpan);
     }
 
     div.appendChild(nameEl);
@@ -1026,13 +1017,11 @@ function doRecommend() {
     detail.className = 'opt-detail';
 
     if (opt.type === 'alkkagi') {
-      const rowInfo = opt.rowBreakdown.map(x =>
-        `${ROWS[x.r]} <strong>-${x.oppLoss}점</strong> (${x.removed}개)`
-      ).join(' / ');
+      const removed = opt.removedCount === 2 ? '더블 파괴' : opt.removedCount === 3 ? '트리플 파괴' : `${opt.removedCount}개 제거`;
       detail.innerHTML =
-        `상대 전체 제거: <strong>${opt.removedCount}개</strong> &nbsp;|&nbsp; 총 손실 <strong>-${opt.totalOppLoss}점</strong><br>` +
-        `${rowInfo}<br>` +
-        `보너스 실드 주사위 평균 +3.5 &nbsp;|&nbsp; 승리 줄: ${opt.winsAfter}개`;
+        `상대 점수 손실: <strong>-${opt.oppLoss}점</strong> (${removed})<br>` +
+        `보너스 실드 주사위: <strong>+3.5</strong>(평균)<br>` +
+        `총 이득: <strong>${opt.totalBenefit.toFixed(1)}점</strong> &nbsp;|&nbsp; 승리 줄: ${opt.winsAfter}개`;
     } else {
       detail.innerHTML =
         `내 점수 → <strong>${opt.newScore}</strong> &nbsp;|&nbsp; 상대: ${opt.oScore}<br>` +
@@ -1051,8 +1040,8 @@ function doRecommend() {
     if (opt.type === 'alkkagi') {
       const trigBtn = document.createElement('button');
       trigBtn.className = 'btn-trigger';
-      trigBtn.textContent = '⚡ 알까기 발동!';
-      trigBtn.onclick = () => triggerAlkkagi();
+      trigBtn.textContent = `⚡ ${ROWS[opt.row]} 알까기 발동`;
+      trigBtn.onclick = () => triggerAlkkagi(opt.row);
       div.appendChild(trigBtn);
     }
 
