@@ -248,8 +248,8 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .die-slot.filled      { border-style: solid; cursor: context-menu; }
 .die-slot.pd { border-color: var(--player); border-width: 2px; background: var(--player-dim); box-shadow: inset 0 0 8px rgba(82,200,112,.12); }
 .die-slot.od { border-color: var(--opp);    border-width: 2px; background: var(--opp-dim);    box-shadow: inset 0 0 8px rgba(224,72,72,.12); }
-.die-slot.sd.pd { border-color: var(--shield); background: rgba(255,213,79,.12); box-shadow: 0 0 10px rgba(255,213,79,.45), inset 0 0 6px rgba(255,213,79,.15); }
-.die-slot.sd.od { border-color: var(--shield); background: rgba(255,213,79,.08); box-shadow: 0 0 10px rgba(255,213,79,.35), inset 0 0 6px rgba(255,213,79,.1); }
+.die-slot.sd.pd { border-color: var(--player); border-width: 2px; background: var(--player-dim); box-shadow: 0 0 0 2px var(--shield), 0 0 14px rgba(255,213,79,.45); }
+.die-slot.sd.od { border-color: var(--opp);    border-width: 2px; background: var(--opp-dim);    box-shadow: 0 0 0 2px var(--shield), 0 0 14px rgba(255,213,79,.45); }
 .die-slot canvas { display: block; }
 .die-slot .sp { position: absolute; top: 1px; right: 2px; font-size: .5rem; color: var(--shield); }
 
@@ -610,7 +610,7 @@ function makeSlot(side, row, slotIdx) {
     slot.className = cls.join(' ');
 
     const cv  = document.createElement('canvas');
-    const col = die.shield ? '#ffd54f' : (side === 'player' ? '#6ee888' : '#ff6868');
+    const col = side === 'player' ? '#6ee888' : '#ff6868';
     drawDie(cv, die.value, col, 40);
     slot.appendChild(cv);
 
