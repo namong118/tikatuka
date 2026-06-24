@@ -233,6 +233,15 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 }
 .btn-trigger:hover { background: rgba(255,157,47,.2); }
 
+.btn-opp-alkkagi {
+  display: block; width: 100%; margin-top: 5px; padding: 4px 6px;
+  border-radius: 5px; border: 1px solid var(--opp);
+  background: rgba(224,72,72,.1); color: var(--opp);
+  font-family: inherit; font-size: .65rem; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.btn-opp-alkkagi:hover { background: rgba(224,72,72,.22); }
+
 /* ─── BOARD ─── */
 .board-headers {
   display: grid; grid-template-columns: 1fr 76px 1fr;
@@ -405,7 +414,7 @@ body.bonus-mode .die-slot.empty {
     <!-- CENTER: 보드 -->
     <div class="board-center">
       <div class="bonus-banner" id="bonusBanner">
-        🛡 보너스 실드 주사위 배치 중
+        <span id="bonusBannerMsg">🛡 보너스 실드 주사위 배치 중</span>
         <small>내 필드 또는 상대 필드의 빈 칸에 배치 · 배치 후 상대 턴</small>
       </div>
       <div class="board-headers" id="boardHeaders">
@@ -499,6 +508,7 @@ const state = {
   isOppShield:   false,
   recommendedRow: null,
   alkkagiBonus:  false,
+  alkkagiSide:   null,           // 'player' | 'opp' — 누가 알까기를 발동했는지
   firstTurn:     null,           // 'player' | 'opp'
   currentTurn:   'player',
   turnCount:     1,
@@ -672,6 +682,19 @@ function renderBoard() {
 
     br.appendChild(rnum); br.appendChild(sc); br.appendChild(badge);
 
+    // 상대 알까기 가능 여부: 상대 해당 줄에 빈칸 있고 + 내 해당 줄에 같은 눈(비실드) 있을 때
+    const oppAlkOk = !state.alkkagiBonus &&
+      state.selectedOppDie !== null &&
+      state.opponentRows[r].length < 3 &&
+      state.playerRows[r].some(d => d.value === state.selectedOppDie && !d.shield);
+    if (oppAlkOk) {
+      const oab = document.createElement('button');
+      oab.className = 'btn-opp-alkkagi';
+      oab.textContent = '⚡ 상대 알까기';
+      oab.onclick = () => triggerOppAlkkagi(r);
+      br.appendChild(oab);
+    }
+
     // Opponent (right)
     const op = document.createElement('div');
     op.className = 'dice-row or';
@@ -715,18 +738,34 @@ function makeSlot(side, row, slotIdx) {
     slot.title = '클릭해서 배치';
     slot.addEventListener('click', () => {
       if (state.alkkagiBonus) {
-        // 보너스 실드 주사위 — 내 필드 or 상대 필드 어디든, 내 주사위 피커 값 사용
-        if (state.selectedDie === null) { alert('왼쪽에서 보너스 주사위 값을 선택하세요!'); return; }
-        rows[row].push({ value: state.selectedDie, shield: true });
+        // 보너스 실드 주사위 — 내/상대 필드 어디든, alkkagiSide에 따라 피커 결정
+        const isPlayerBonus = state.alkkagiSide === 'player';
+        const bonusVal = isPlayerBonus ? state.selectedDie : state.selectedOppDie;
+        if (bonusVal === null) {
+          alert(isPlayerBonus ? '왼쪽에서 보너스 주사위 값을 선택하세요!' : '오른쪽에서 보너스 주사위 값을 선택하세요!');
+          return;
+        }
+        rows[row].push({ value: bonusVal, shield: true });
         exitBonusMode();
-        state.selectedDie = null;
-        state.isShield = false;
-        document.getElementById('shieldToggle').classList.remove('active');
-        document.getElementById('shieldLabel').textContent = '일반';
-        document.querySelectorAll('#diePicker .die-btn').forEach(b => {
-          b.classList.remove('active');
-          drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
-        });
+        if (isPlayerBonus) {
+          state.selectedDie = null;
+          state.isShield = false;
+          document.getElementById('shieldToggle').classList.remove('active');
+          document.getElementById('shieldLabel').textContent = '일반';
+          document.querySelectorAll('#diePicker .die-btn').forEach(b => {
+            b.classList.remove('active');
+            drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
+          });
+        } else {
+          state.selectedOppDie = null;
+          state.isOppShield = false;
+          document.getElementById('oppShieldToggle').classList.remove('active');
+          document.getElementById('oppShieldLabel').textContent = '일반';
+          document.querySelectorAll('#oppDiePicker .die-btn').forEach(b => {
+            b.classList.remove('active-opp');
+            drawDie(b.querySelector('canvas'), +b.dataset.val, '#a05858', 40);
+          });
+        }
         document.getElementById('recPanel').className = 'rec-panel';
         document.getElementById('recMain').textContent = '내 주사위 값(왼쪽)을 선택하고 추천 받기를 눌러주세요.';
         document.getElementById('recOptions').innerHTML = '';
@@ -1110,24 +1149,49 @@ function triggerAlkkagi(rowIdx) {
   const v = state.selectedDie;
   if (v === null) { alert('주사위 값을 선택하세요!'); return; }
 
-  // 줄별: 해당 줄(rowIdx)의 상대 주사위만 제거
   state.opponentRows[rowIdx] = state.opponentRows[rowIdx].filter(d => !(d.value === v && !d.shield));
 
   state.alkkagiBonus = true;
+  state.alkkagiSide  = 'player';
   document.body.classList.add('bonus-mode');
   document.getElementById('bonusBanner').classList.add('show');
+  document.getElementById('bonusBannerMsg').textContent = '🛡 내 알까기! 왼쪽에서 보너스 주사위 값 선택 후 배치';
 
-  // Reset die selection for bonus die
   state.selectedDie = null;
   document.querySelectorAll('#diePicker .die-btn').forEach(b => {
     b.classList.remove('active');
     drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
   });
 
-  // Reset recommendation — 주사위 선택 시 자동 추천됨
-  const panel = document.getElementById('recPanel');
-  panel.className = 'rec-panel bonus-mode-panel';
-  document.getElementById('recMain').innerHTML = '🛡 알까기 발동! <strong>보너스 주사위 값</strong>을 선택하면 최적 배치를 추천합니다.';
+  document.getElementById('recPanel').className = 'rec-panel bonus-mode-panel';
+  document.getElementById('recMain').innerHTML = '🛡 알까기 발동! <strong>왼쪽</strong>에서 보너스 주사위 값을 선택하세요.';
+  document.getElementById('recOptions').innerHTML = '';
+  state.recommendedRow = null;
+
+  render();
+}
+
+function triggerOppAlkkagi(rowIdx) {
+  const v = state.selectedOppDie;
+  if (v === null) { alert('오른쪽에서 상대 주사위 값을 선택하세요!'); return; }
+
+  // 내 필드에서 해당 줄의 같은 눈(실드 제외) 제거
+  state.playerRows[rowIdx] = state.playerRows[rowIdx].filter(d => !(d.value === v && !d.shield));
+
+  state.alkkagiBonus = true;
+  state.alkkagiSide  = 'opp';
+  document.body.classList.add('bonus-mode');
+  document.getElementById('bonusBanner').classList.add('show');
+  document.getElementById('bonusBannerMsg').textContent = '🛡 상대 알까기! 오른쪽에서 보너스 주사위 값 선택 후 배치';
+
+  state.selectedOppDie = null;
+  document.querySelectorAll('#oppDiePicker .die-btn').forEach(b => {
+    b.classList.remove('active-opp');
+    drawDie(b.querySelector('canvas'), +b.dataset.val, '#a05858', 40);
+  });
+
+  document.getElementById('recPanel').className = 'rec-panel bonus-mode-panel';
+  document.getElementById('recMain').innerHTML = '🛡 상대 알까기 발동! <strong>오른쪽</strong>에서 보너스 주사위 값을 선택하세요.';
   document.getElementById('recOptions').innerHTML = '';
   state.recommendedRow = null;
 
@@ -1136,6 +1200,7 @@ function triggerAlkkagi(rowIdx) {
 
 function exitBonusMode() {
   state.alkkagiBonus = false;
+  state.alkkagiSide  = null;
   document.body.classList.remove('bonus-mode');
   document.getElementById('bonusBanner').classList.remove('show');
 }
