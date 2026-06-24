@@ -711,12 +711,13 @@ function makeSlot(side, row, slotIdx) {
   const slot = document.createElement('div');
 
   if (die) {
-    const cls = ['die-slot', 'filled', side === 'player' ? 'pd' : 'od'];
+    const isOppColored = side === 'opp' || die.fromOpp;
+    const cls = ['die-slot', 'filled', isOppColored ? 'od' : 'pd'];
     if (die.shield) cls.push('sd');
     slot.className = cls.join(' ');
 
     const cv  = document.createElement('canvas');
-    const col = side === 'player' ? '#6ee888' : '#ff6868';
+    const col = isOppColored ? '#ff6868' : '#6ee888';
     drawDie(cv, die.value, col, 40);
     slot.appendChild(cv);
 
@@ -792,7 +793,9 @@ function makeSlot(side, row, slotIdx) {
         alert('왼쪽 또는 오른쪽에서 주사위 값을 선택하세요!');
         return;
       }
-      rows[row].push({ value: dieVal, shield: useShield });
+      // 상대 피커로 내 필드에 배치한 경우 fromOpp 표시 (빨간색 렌더링)
+      const fromOpp = (side === 'player' && usedPicker === 'opp');
+      rows[row].push({ value: dieVal, shield: useShield, fromOpp });
 
       // 배치 후 사용한 피커 선택 해제
       if (usedPicker === 'player') {
