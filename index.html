@@ -421,7 +421,10 @@ body.bonus-mode .die-slot.empty {
       <div class="panel-title opp">상대 주사위</div>
       <div class="die-picker-grid" id="oppDiePicker"></div>
       <div class="panel-divider"></div>
-      <div class="opp-panel-note">선택 후 상대 필드<br>빈 칸 클릭으로 배치</div>
+      <div class="shield-toggle" id="oppShieldToggle" onclick="toggleOppShield()">
+        <span>🛡</span>
+        <span id="oppShieldLabel">일반</span>
+      </div>
     </div>
 
   </div><!-- /main-grid -->
@@ -493,6 +496,7 @@ const state = {
   selectedDie:   null,   // 내 주사위 (왼쪽 피커)
   selectedOppDie: null,  // 상대 주사위 (오른쪽 피커)
   isShield:      false,
+  isOppShield:   false,
   recommendedRow: null,
   alkkagiBonus:  false,
   firstTurn:     null,           // 'player' | 'opp'
@@ -736,7 +740,30 @@ function makeSlot(side, row, slotIdx) {
         alert(side === 'player' ? '왼쪽에서 내 주사위 값을 선택하세요!' : '오른쪽에서 상대 주사위 값을 선택하세요!');
         return;
       }
-      rows[row].push({ value: dieVal, shield: state.isShield });
+      const useShield = side === 'player' ? state.isShield : state.isOppShield;
+      rows[row].push({ value: dieVal, shield: useShield });
+
+      // 배치 후 해당 피커 선택 해제
+      if (side === 'player') {
+        state.selectedDie = null;
+        state.isShield = false;
+        document.getElementById('shieldToggle').classList.remove('active');
+        document.getElementById('shieldLabel').textContent = '일반';
+        document.querySelectorAll('#diePicker .die-btn').forEach(b => {
+          b.classList.remove('active');
+          drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
+        });
+      } else {
+        state.selectedOppDie = null;
+        state.isOppShield = false;
+        document.getElementById('oppShieldToggle').classList.remove('active');
+        document.getElementById('oppShieldLabel').textContent = '일반';
+        document.querySelectorAll('#oppDiePicker .die-btn').forEach(b => {
+          b.classList.remove('active-opp');
+          drawDie(b.querySelector('canvas'), +b.dataset.val, '#a05858', 40);
+        });
+      }
+
       state.recommendedRow = null;
       document.getElementById('recPanel').className = 'rec-panel';
       document.getElementById('recMain').textContent = '내 주사위 값(왼쪽)을 선택하고 추천 받기를 눌러주세요.';
@@ -1046,6 +1073,12 @@ function toggleShield() {
   document.getElementById('shieldLabel').textContent = state.isShield ? '실드' : '일반';
 }
 
+function toggleOppShield() {
+  state.isOppShield = !state.isOppShield;
+  document.getElementById('oppShieldToggle').classList.toggle('active', state.isOppShield);
+  document.getElementById('oppShieldLabel').textContent = state.isOppShield ? '실드' : '일반';
+}
+
 function toggleTajja() {
   state.hasTajja = !state.hasTajja;
   document.getElementById('tajjaToggle').classList.toggle('active', state.hasTajja);
@@ -1235,6 +1268,7 @@ function resetGame() {
   state.selectedDie   = null;
   state.selectedOppDie = null;
   state.isShield      = false;
+  state.isOppShield   = false;
   state.turnCount     = 1;
   state.currentTurn   = state.firstTurn || 'player';
   state.hasTajja      = true;
@@ -1242,6 +1276,8 @@ function resetGame() {
 
   document.getElementById('shieldToggle').classList.remove('active');
   document.getElementById('shieldLabel').textContent = '일반';
+  document.getElementById('oppShieldToggle').classList.remove('active');
+  document.getElementById('oppShieldLabel').textContent = '일반';
   document.getElementById('tajjaToggle').classList.add('active');
   document.getElementById('tajjaLabel').textContent = '보유';
   document.querySelectorAll('#diePicker .die-btn').forEach(b => {
