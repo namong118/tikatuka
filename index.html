@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>티카투카 전략 도우미</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #091a2f;
+  --bg2:       #0d2240;
+  --surface:   #102a4a;
+  --surface2:  #163460;
+  --border:    #1e4070;
+  --gold:      #e8a020;
+  --gold-dim:  #7a5510;
+  --gold-glow: rgba(232,160,32,.25);
+  --player:    #4a9eff;
+  --player-dim:#1a4880;
+  --opp:       #e05252;
+  --opp-dim:   #6a1818;
+  --win:       #3dcf8a;
+  --lose:      #e05252;
+  --shield:    #ffd54f;
+  --text:      #c8daf0;
+  --text-dim:  #4a7090;
+  --alkkagi:   #ff9d2f;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  min-height: 100vh;
+  padding: 0 12px 40px;
+}
+
+/* ─── HEADER ─── */
+header {
+  text-align: center;
+  padding: 24px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -.5px;
+  color: var(--gold);
+  text-shadow: 0 0 24px var(--gold-glow);
+}
+header p {
+  font-size: .78rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  letter-spacing: .5px;
+}
+
+/* ─── LAYOUT WRAPPER ─── */
+.app {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── PANELS ─── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+/* ─── CONTROL BAR ─── */
+.control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-label {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+}
+
+.die-picker {
+  display: flex;
+  gap: 5px;
+}
+
+/* Die button – uses canvas for pips */
+.die-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 7px;
+  border: 2px solid var(--border);
+  background: var(--bg2);
+  cursor: pointer;
+  position: relative;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  padding: 0;
+  overflow: hidden;
+}
+.die-btn canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.die-btn:hover { border-color: var(--gold-dim); background: var(--surface2); }
+.die-btn.active {
+  border-color: var(--gold);
+  background: var(--bg2);
+  box-shadow: 0 0 10px var(--gold-glow);
+}
+
+.shield-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: .85rem;
+  color: var(--text-dim);
+  transition: border-color .15s, color .15s;
+  user-select: none;
+}
+.shield-toggle.active {
+  border-color: var(--shield);
+  color: var(--shield);
+  box-shadow: 0 0 8px rgba(255,213,79,.2);
+}
+.shield-icon { font-size: 1rem; }
+
+.mode-toggle {
+  display: flex;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.mode-btn {
+  padding: 8px 14px;
+  font-size: .82rem;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  transition: background .15s, color .15s;
+}
+.mode-btn.active-player { background: var(--player-dim); color: var(--player); }
+.mode-btn.active-opp    { background: var(--opp-dim); color: var(--opp); }
+
+.btn-group { display: flex; gap: 6px; margin-left: auto; }
+
+.btn {
+  padding: 9px 16px;
+  border-radius: 7px;
+  border: none;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, background .15s;
+}
+.btn:hover { opacity: .85; }
+.btn-recommend {
+  background: var(--gold);
+  color: #000;
+}
+.btn-reset {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* ─── RECOMMENDATION PANEL ─── */
+.rec-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: border-color .2s;
+}
+.rec-panel.has-rec {
+  border-color: var(--win);
+  box-shadow: 0 0 16px rgba(61,207,138,.12);
+}
+.rec-panel.has-alkkagi {
+  border-color: var(--alkkagi);
+  box-shadow: 0 0 16px rgba(255,157,47,.15);
+}
+
+.rec-header {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.rec-main {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  min-height: 24px;
+}
+.rec-main .row-highlight {
+  color: var(--win);
+  font-size: 1.3rem;
+}
+.rec-main .alkkagi-highlight {
+  color: var(--alkkagi);
+}
+
+.rec-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.rec-option {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: .8rem;
+  flex: 1;
+  min-width: 130px;
+}
+.rec-option.best {
+  border-color: var(--win);
+  background: rgba(61,207,138,.07);
+}
+.rec-option .opt-row {
+  font-weight: 800;
+  font-size: .95rem;
+  margin-bottom: 3px;
+}
+.rec-option.best .opt-row { color: var(--win); }
+.rec-option .opt-detail { color: var(--text-dim); font-size: .75rem; line-height: 1.5; }
+
+.alkkagi-box {
+  margin-top: 10px;
+  background: rgba(255,157,47,.1);
+  border: 1px solid var(--alkkagi);
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-size: .82rem;
+  color: var(--alkkagi);
+  display: none;
+}
+.alkkagi-box.show { display: block; }
+
+/* ─── GAME BOARD ─── */
+.board-section { display: flex; flex-direction: column; gap: 8px; }
+
+.row-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr;
+  gap: 10px;
+  align-items: center;
+  transition: box-shadow .2s;
+}
+.row-card.recommended {
+  border-color: var(--win);
+  box-shadow: 0 0 12px rgba(61,207,138,.15);
+}
+.row-card.alkkagi-row {
+  border-color: var(--alkkagi);
+}
+
+.row-label-col {
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.row-score-bridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.row-num-badge {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.scores {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.score-val {
+  font-size: 1.15rem;
+  font-weight: 900;
+  min-width: 28px;
+  text-align: center;
+}
+.score-player { color: var(--player); }
+.score-opp    { color: var(--opp); }
+.score-sep    { color: var(--text-dim); font-size: .75rem; }
+.win-badge {
+  font-size: .6rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.win-badge.player { background: var(--player-dim); color: var(--player); }
+.win-badge.opp    { background: var(--opp-dim); color: var(--opp); }
+.win-badge.tie    { background: var(--surface2); color: var(--text-dim); }
+
+/* Dice slots */
+.dice-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.dice-row.opp-row { justify-content: flex-end; }
+.dice-row.player-row { justify-content: flex-start; }
+
+.die-slot {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  position: relative;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.die-slot canvas { display: block; }
+.die-slot.empty:hover {
+  border-color: var(--text-dim);
+  background: var(--surface2);
+}
+.die-slot.filled {
+  border-style: solid;
+  cursor: context-menu;
+}
+.die-slot.filled.player-die {
+  border-color: var(--player);
+  background: var(--player-dim);
+}
+.die-slot.filled.opp-die {
+  border-color: var(--opp);
+  background: var(--opp-dim);
+}
+.die-slot.filled.shield-die.player-die {
+  border-color: var(--shield);
+  background: rgba(255,213,79,.15);
+  box-shadow: 0 0 8px rgba(255,213,79,.3);
+}
+.die-slot.filled.shield-die.opp-die {
+  border-color: var(--shield);
+  background: rgba(255,213,79,.1);
+  box-shadow: 0 0 8px rgba(255,213,79,.25);
+}
+.die-slot .shield-pip {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: .5rem;
+  line-height: 1;
+  color: var(--shield);
+}
+
+/* ─── SCOREBOARD ─── */
+.scoreboard {
+  display: flex;
+  gap: 8px;
+}
+.score-card {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.score-card .sc-label {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.score-card .sc-val {
+  font-size: 2.2rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.score-card.player-card .sc-val { color: var(--player); }
+.score-card.opp-card    .sc-val { color: var(--opp); }
+.score-card .sc-note { font-size: .72rem; color: var(--text-dim); margin-top: 4px; }
+
+.win-indicator {
+  text-align: center;
+  padding: 14px;
+  border-radius: 9px;
+  font-size: .9rem;
+  font-weight: 700;
+  display: none;
+}
+.win-indicator.show { display: block; }
+.win-indicator.player-win {
+  background: rgba(61,207,138,.1);
+  border: 1px solid var(--win);
+  color: var(--win);
+}
+.win-indicator.opp-win {
+  background: rgba(224,82,82,.1);
+  border: 1px solid var(--opp);
+  color: var(--opp);
+}
+
+/* ─── HOW TO USE ─── */
+.how-to {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: .78rem;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+.how-to strong { color: var(--text); }
+
+/* responsive */
+@media (max-width: 600px) {
+  .die-slot { width: 38px; height: 38px; }
+  .die-btn  { width: 38px; height: 38px; }
+  .row-card { grid-template-columns: 1fr 66px 1fr; gap: 6px; }
+  .score-val { font-size: .95rem; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎲 티카투카 전략 도우미</h1>
+  <p>로스트아크 이벤트 · 주사위 배치 최적화 도우미</p>
+</header>
+
+<div class="app">
+
+  <!-- CONTROLS -->
+  <div class="panel control-bar">
+    <div class="control-group">
+      <div class="control-label">주사위 값 선택</div>
+      <div class="die-picker" id="diePicker"></div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">실드 주사위</div>
+      <div class="shield-toggle" id="shieldToggle" onclick="toggleShield()">
+        <span class="shield-icon">🛡</span>
+        <span id="shieldLabel">일반</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">배치 대상</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active-player" id="modePlayer" onclick="setMode('player')">내 필드</button>
+        <button class="mode-btn" id="modeOpp" onclick="setMode('opp')">상대 필드</button>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-recommend" onclick="doRecommend()">추천 받기</button>
+      <button class="btn btn-reset" onclick="resetGame()">게임 리셋</button>
+    </div>
+  </div>
+
+  <!-- RECOMMENDATION -->
+  <div class="rec-panel" id="recPanel">
+    <div class="rec-header">전략 추천</div>
+    <div class="rec-main" id="recMain">주사위 값을 선택하고 <strong>추천 받기</strong>를 눌러주세요.</div>
+    <div class="rec-options" id="recOptions"></div>
+    <div class="alkkagi-box" id="alkkagiBox"></div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="board-section" id="boardSection"></div>
+
+  <!-- SCOREBOARD -->
+  <div class="scoreboard">
+    <div class="score-card opp-card">
+      <div class="sc-label">상대 승리 줄</div>
+      <div class="sc-val" id="oppWins">0</div>
+      <div class="sc-note">2줄 이상 시 승리</div>
+    </div>
+    <div class="score-card player-card">
+      <div class="sc-label">내 승리 줄</div>
+      <div class="sc-val" id="playerWins">0</div>
+      <div class="sc-note">2줄 이상 시 승리</div>
+    </div>
+  </div>
+
+  <div class="win-indicator" id="winIndicator"></div>
+
+  <!-- HOW TO USE -->
+  <div class="how-to">
+    <strong>사용법</strong><br>
+    ① 주사위 값 선택 → 배치 대상(내 필드/상대 필드) 선택 → <strong>추천 받기</strong> 또는 슬롯 직접 클릭<br>
+    ② 슬롯 <strong>우클릭</strong>으로 주사위 제거 &nbsp;|&nbsp; 실드 주사위는 🛡 선택 후 배치<br>
+    ③ 상대 필드도 게임 화면 보며 직접 입력하세요<br>
+    <br>
+    <strong>보너스 계산</strong> &nbsp;더블: 같은 눈 2개 → ×3 &nbsp;|&nbsp; 트리플: 같은 눈 3개 → ×5<br>
+    <strong>알까기</strong> &nbsp;내 주사위와 같은 눈이 상대 필드에 있으면 모두 제거 + 보너스 주사위 1개
+  </div>
+
+</div>
+
+<script>
+// ─── DICE PIP RENDERER ───────────────────────────────────────────────────────
+const PIP_POSITIONS = {
+  1: [[.5,.5]],
+  2: [[.25,.25],[.75,.75]],
+  3: [[.25,.25],[.5,.5],[.75,.75]],
+  4: [[.25,.25],[.75,.25],[.25,.75],[.75,.75]],
+  5: [[.25,.25],[.75,.25],[.5,.5],[.25,.75],[.75,.75]],
+  6: [[.25,.2],[.75,.2],[.25,.5],[.75,.5],[.25,.8],[.75,.8]],
+};
+
+function drawDie(canvas, value, color, size) {
+  size = size || canvas.width;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const r = 5;
+  const s = size;
+
+  // Clear
+  ctx.clearRect(0, 0, s, s);
+
+  // Draw pips
+  const pips = PIP_POSITIONS[value] || [];
+  ctx.fillStyle = color;
+  pips.forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.arc(px * s, py * s, s * .09, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// ─── GAME STATE ───────────────────────────────────────────────────────────────
+// Each die: { value: 1-6, shield: bool }
+const state = {
+  playerRows: [[], [], []],
+  opponentRows: [[], [], []],
+  selectedDie: null,
+  isShield: false,
+  mode: 'player',
+  recommendedRow: null,
+};
+
+// ─── SCORE LOGIC ─────────────────────────────────────────────────────────────
+function rowScore(dice) {
+  if (!dice.length) return 0;
+  const counts = {};
+  dice.forEach(d => { counts[d.value] = (counts[d.value] || 0) + 1; });
+  let score = 0;
+  for (const [v, cnt] of Object.entries(counts)) {
+    const val = +v;
+    if (cnt === 1) score += val;
+    else if (cnt === 2) score += val * 3;
+    else if (cnt === 3) score += val * 5;
+  }
+  return score;
+}
+
+function rowScoreLabel(dice) {
+  if (!dice.length) return '0';
+  const counts = {};
+  dice.forEach(d => { counts[d.value] = (counts[d.value] || 0) + 1; });
+  const parts = [];
+  let score = 0;
+  for (const [v, cnt] of Object.entries(counts)) {
+    const val = +v;
+    if (cnt === 1) { score += val; parts.push(`${val}`); }
+    else if (cnt === 2) { score += val*3; parts.push(`더블${val}(${val*3})`); }
+    else if (cnt === 3) { score += val*5; parts.push(`트리플${val}(${val*5})`); }
+  }
+  return score + (parts.some(p => p.includes('(')) ? ' (' + parts.join(', ') + ')' : '');
+}
+
+// ─── ALKKAGI ─────────────────────────────────────────────────────────────────
+function alkkagiPossible(dieValue, playerRows, opponentRows) {
+  const opHas = opponentRows.some(row => row.some(d => d.value === dieValue && !d.shield));
+  const plSpace = playerRows.some(row => row.length < 3);
+  return opHas && plSpace;
+}
+
+function alkkagiEffect(dieValue, opponentRows) {
+  let removedScore = 0, removedCount = 0;
+  opponentRows.forEach(row => {
+    row.forEach(d => {
+      if (d.value === dieValue && !d.shield) {
+        removedCount++;
+        removedScore += dieValue;
+      }
+    });
+  });
+  return { removedCount, removedScore };
+}
+
+// ─── RECOMMENDATION ──────────────────────────────────────────────────────────
+function getRecommendations(dieValue) {
+  const alkkagi = alkkagiPossible(dieValue, state.playerRows, state.opponentRows);
+  const alkEffect = alkkagi ? alkkagiEffect(dieValue, state.opponentRows) : null;
+
+  const options = [];
+
+  for (let r = 0; r < 3; r++) {
+    const pRow = state.playerRows[r];
+    if (pRow.length >= 3) {
+      options.push({ row: r, full: true, heuristic: -999 });
+      continue;
+    }
+
+    const oldScore = rowScore(pRow);
+    const newDice  = [...pRow, { value: dieValue, shield: false }];
+    const newScore = rowScore(newDice);
+    const gain     = newScore - oldScore;
+    const oScore   = rowScore(state.opponentRows[r]);
+    const diff     = newScore - oScore;
+
+    // How many dice of this value will be in this row after placement
+    const sameCount = newDice.filter(d => d.value === dieValue).length;
+
+    // Win count after this placement (optimistic for player)
+    let wins = 0;
+    for (let i = 0; i < 3; i++) {
+      const ps = i === r ? newScore : rowScore(state.playerRows[i]);
+      const os = rowScore(state.opponentRows[i]);
+      if (ps > os) wins++;
+    }
+
+    // Heuristic scoring
+    let heuristic = gain * 2;
+
+    // Big bonus for completing triple or double
+    if (sameCount === 3) heuristic += 35;
+    else if (sameCount === 2) heuristic += 15;
+
+    // Bonus if this placement makes us win this row
+    if (diff > 0) heuristic += 18;
+    else if (diff === 0) heuristic += 4;
+
+    // Bonus for overall wins
+    heuristic += wins * 7;
+
+    // Check if opp row is already locked and we can't win it
+    const oFull = state.opponentRows[r].length === 3;
+    const maxPossible = maxRowScore(newDice);
+    if (oFull && oScore >= maxPossible) heuristic -= 20;
+
+    // Bonus label
+    let bonusLabel = '';
+    if (sameCount === 3) bonusLabel = '🔥 트리플 완성!';
+    else if (sameCount === 2) bonusLabel = '✨ 더블 완성';
+    else if (diff > 0) bonusLabel = '우세 확보';
+    else if (diff === 0 && oScore > 0) bonusLabel = '동점';
+    else if (gain > 0) bonusLabel = `+${gain}점`;
+
+    options.push({ row: r, gain, newScore, oScore, diff, wins, heuristic, bonusLabel, sameCount, full: false });
+  }
+
+  options.sort((a, b) => b.heuristic - a.heuristic);
+  return { options, alkkagi, alkEffect };
+}
+
+function maxRowScore(dice) {
+  const temp = [...dice];
+  while (temp.length < 3) temp.push({ value: 6, shield: false });
+  return rowScore(temp);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  renderBoard();
+  renderScoreboard();
+}
+
+function renderBoard() {
+  const sec = document.getElementById('boardSection');
+  sec.innerHTML = '';
+
+  for (let r = 0; r < 3; r++) {
+    const pScore = rowScore(state.playerRows[r]);
+    const oScore = rowScore(state.opponentRows[r]);
+
+    const isRec = state.recommendedRow === r;
+    const card = document.createElement('div');
+    card.className = 'row-card' + (isRec ? ' recommended' : '');
+
+    // Opponent side
+    const oppSide = document.createElement('div');
+    oppSide.className = 'dice-row opp-row';
+    // Show slots right-to-left for opponent
+    for (let s = 2; s >= 0; s--) {
+      oppSide.appendChild(makeSlot('opp', r, s));
+    }
+
+    // Score bridge
+    const bridge = document.createElement('div');
+    bridge.className = 'row-score-bridge';
+    const badge = document.createElement('div');
+    badge.className = 'row-num-badge';
+    badge.textContent = (r + 1) + '번 줄';
+    const scoreRow = document.createElement('div');
+    scoreRow.className = 'scores';
+    const sv1 = document.createElement('div');
+    sv1.className = 'score-val score-opp';
+    sv1.textContent = oScore;
+    const sep = document.createElement('div');
+    sep.className = 'score-sep';
+    sep.textContent = 'vs';
+    const sv2 = document.createElement('div');
+    sv2.className = 'score-val score-player';
+    sv2.textContent = pScore;
+    scoreRow.appendChild(sv1);
+    scoreRow.appendChild(sep);
+    scoreRow.appendChild(sv2);
+
+    const wb = document.createElement('div');
+    if (pScore > oScore) { wb.className = 'win-badge player'; wb.textContent = '내 우세'; }
+    else if (oScore > pScore) { wb.className = 'win-badge opp'; wb.textContent = '상대 우세'; }
+    else { wb.className = 'win-badge tie'; wb.textContent = '동점'; }
+
+    bridge.appendChild(badge);
+    bridge.appendChild(scoreRow);
+    bridge.appendChild(wb);
+
+    // Player side
+    const playerSide = document.createElement('div');
+    playerSide.className = 'dice-row player-row';
+    for (let s = 0; s < 3; s++) {
+      playerSide.appendChild(makeSlot('player', r, s));
+    }
+
+    card.appendChild(oppSide);
+    card.appendChild(bridge);
+    card.appendChild(playerSide);
+    sec.appendChild(card);
+  }
+}
+
+function makeSlot(side, row, slotIdx) {
+  const rows = side === 'player' ? state.playerRows : state.opponentRows;
+  const die  = rows[row][slotIdx];
+  const slot = document.createElement('div');
+
+  if (die) {
+    const isShield = die.shield;
+    slot.className = `die-slot filled ${side}-die${isShield ? ' shield-die' : ''}`;
+
+    const canvas = document.createElement('canvas');
+    const color  = side === 'player'
+      ? (isShield ? '#ffd54f' : '#4a9eff')
+      : (isShield ? '#ffd54f' : '#e05252');
+    drawDie(canvas, die.value, color, 40);
+    slot.appendChild(canvas);
+
+    if (isShield) {
+      const sp = document.createElement('span');
+      sp.className = 'shield-pip';
+      sp.textContent = '🛡';
+      slot.appendChild(sp);
+    }
+
+    slot.title = `우클릭으로 제거`;
+    slot.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      rows[row].splice(slotIdx, 1);
+      state.recommendedRow = null;
+      render();
+    });
+  } else {
+    slot.className = 'die-slot empty';
+    slot.title = side === 'player' ? '클릭해서 배치' : '상대 주사위 배치';
+    slot.addEventListener('click', () => {
+      if (state.selectedDie === null) {
+        alert('먼저 주사위 값을 선택하세요!');
+        return;
+      }
+      if (state.mode === 'player' && side !== 'player') {
+        alert('내 필드 모드입니다. 모드를 변경하거나 내 필드에 배치하세요.');
+        return;
+      }
+      if (state.mode === 'opp' && side !== 'opp') {
+        alert('상대 필드 모드입니다. 모드를 변경하거나 상대 필드에 배치하세요.');
+        return;
+      }
+      rows[row].push({ value: state.selectedDie, shield: state.isShield });
+      state.recommendedRow = null;
+      render();
+    });
+  }
+
+  return slot;
+}
+
+function renderScoreboard() {
+  let pWins = 0, oWins = 0;
+  for (let r = 0; r < 3; r++) {
+    const ps = rowScore(state.playerRows[r]);
+    const os = rowScore(state.opponentRows[r]);
+    if (ps > os) pWins++;
+    else if (os > ps) oWins++;
+  }
+  document.getElementById('playerWins').textContent = pWins;
+  document.getElementById('oppWins').textContent    = oWins;
+
+  const ind = document.getElementById('winIndicator');
+  if (pWins >= 2) {
+    ind.className = 'win-indicator show player-win';
+    ind.textContent = '🎉 현재 내가 이기고 있습니다! 이 흐름 유지하세요.';
+  } else if (oWins >= 2) {
+    ind.className = 'win-indicator show opp-win';
+    ind.textContent = '⚠️ 상대가 앞서고 있습니다. 역전 노려야 합니다!';
+  } else {
+    ind.className = 'win-indicator';
+    ind.textContent = '';
+  }
+}
+
+// ─── DIE PICKER INIT ─────────────────────────────────────────────────────────
+function initDiePicker() {
+  const picker = document.getElementById('diePicker');
+  for (let v = 1; v <= 6; v++) {
+    const btn = document.createElement('button');
+    btn.className = 'die-btn';
+    btn.title = `${v}`;
+    btn.dataset.val = v;
+
+    const canvas = document.createElement('canvas');
+    drawDie(canvas, v, '#6090c0', 40);
+    btn.appendChild(canvas);
+
+    btn.addEventListener('click', () => selectDie(v));
+    picker.appendChild(btn);
+  }
+}
+
+function selectDie(v) {
+  state.selectedDie = v;
+  document.querySelectorAll('.die-btn').forEach(b => {
+    b.classList.toggle('active', +b.dataset.val === v);
+    const color = +b.dataset.val === v ? '#e8a020' : '#6090c0';
+    drawDie(b.querySelector('canvas'), +b.dataset.val, color, 40);
+  });
+}
+
+function toggleShield() {
+  state.isShield = !state.isShield;
+  const toggle = document.getElementById('shieldToggle');
+  const label  = document.getElementById('shieldLabel');
+  toggle.classList.toggle('active', state.isShield);
+  label.textContent = state.isShield ? '실드' : '일반';
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  document.getElementById('modePlayer').className =
+    'mode-btn' + (mode === 'player' ? ' active-player' : '');
+  document.getElementById('modeOpp').className =
+    'mode-btn' + (mode === 'opp' ? ' active-opp' : '');
+}
+
+// ─── RECOMMENDATION ──────────────────────────────────────────────────────────
+function doRecommend() {
+  if (state.selectedDie === null) {
+    alert('먼저 주사위 값(1~6)을 선택하세요!');
+    return;
+  }
+
+  const { options, alkkagi, alkEffect } = getRecommendations(state.selectedDie);
+
+  const panel   = document.getElementById('recPanel');
+  const main    = document.getElementById('recMain');
+  const optsCon = document.getElementById('recOptions');
+  const alkBox  = document.getElementById('alkkagiBox');
+
+  optsCon.innerHTML = '';
+  alkBox.classList.remove('show');
+
+  const validOpts = options.filter(o => !o.full);
+
+  if (!validOpts.length) {
+    panel.className = 'rec-panel';
+    main.innerHTML = '내 필드가 가득 찼습니다!';
+    return;
+  }
+
+  const best = validOpts[0];
+  state.recommendedRow = best.row;
+
+  panel.className = 'rec-panel has-rec' + (alkkagi ? ' has-alkkagi' : '');
+
+  const rowNames = ['1번 줄', '2번 줄', '3번 줄'];
+  if (alkkagi) {
+    main.innerHTML = `<span class="alkkagi-highlight">⚡ 알까기 발동 가능!</span> 기본 추천: <span class="row-highlight">${rowNames[best.row]}</span>에 배치`;
+  } else {
+    main.innerHTML = `추천: <span class="row-highlight">${rowNames[best.row]}</span>에 배치 &nbsp;${best.bonusLabel || ''}`;
+  }
+
+  // Show top options (up to 3)
+  validOpts.slice(0, 3).forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'rec-option' + (i === 0 ? ' best' : '');
+
+    const scoreAfter = `내 점수 → ${opt.newScore}`;
+    const vsLine     = `상대: ${opt.oScore} | ${opt.diff > 0 ? '✓ 우세' : opt.diff < 0 ? '✗ 열세' : '= 동점'}`;
+    const bonusLine  = opt.sameCount === 3 ? '🔥 트리플 완성' : opt.sameCount === 2 ? '✨ 더블 완성' : '';
+
+    div.innerHTML = `
+      <div class="opt-row">${rowNames[opt.row]}</div>
+      <div class="opt-detail">
+        ${scoreAfter}<br>
+        ${vsLine}<br>
+        ${bonusLine ? bonusLine + '<br>' : ''}
+        ${i === 0 ? '<strong>← 최적 배치</strong>' : ''}
+      </div>
+    `;
+    optsCon.appendChild(div);
+  });
+
+  // Alkkagi box
+  if (alkkagi && alkEffect) {
+    alkBox.classList.add('show');
+    const shieldNote = alkEffect.removedCount === 0
+      ? '상대 주사위가 모두 실드라 알까기 효과 없음'
+      : `상대의 ${state.selectedDie} 주사위 ${alkEffect.removedCount}개 제거 (${alkEffect.removedScore}점 손실) + 보너스 실드 주사위 1개 획득`;
+
+    let recommendation = '';
+    if (alkEffect.removedCount >= 2) {
+      recommendation = '<br>👍 상대 더블/트리플 파괴 효과 — <strong>알까기 강력 추천!</strong>';
+    } else if (alkEffect.removedCount === 1) {
+      recommendation = '<br>💡 효과는 있으나 보너스 주사위 활용이 핵심';
+    }
+
+    alkBox.innerHTML = `⚡ <strong>알까기 발동 가능</strong><br>${shieldNote}${recommendation}`;
+  }
+
+  render();
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetGame() {
+  if (!confirm('게임을 리셋하시겠습니까?')) return;
+  state.playerRows   = [[], [], []];
+  state.opponentRows = [[], [], []];
+  state.recommendedRow = null;
+
+  // Reset recommendation panel
+  document.getElementById('recPanel').className = 'rec-panel';
+  document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+  document.getElementById('recOptions').innerHTML = '';
+  document.getElementById('alkkagiBox').classList.remove('show');
+
+  render();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+initDiePicker();
+render();
+</script>
+</body>
+</html>
