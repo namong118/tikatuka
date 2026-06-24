@@ -773,17 +773,29 @@ function makeSlot(side, row, slotIdx) {
         return;
       }
 
-      // 일반 배치: 내 슬롯은 selectedDie, 상대 슬롯은 selectedOppDie
-      const dieVal = side === 'player' ? state.selectedDie : state.selectedOppDie;
-      if (dieVal === null) {
-        alert(side === 'player' ? '왼쪽에서 내 주사위 값을 선택하세요!' : '오른쪽에서 상대 주사위 값을 선택하세요!');
+      // 일반 배치: 선택된 피커 우선 사용, 둘 다 선택됐으면 해당 필드 피커 우선
+      let dieVal, useShield, usedPicker;
+      if (side === 'player') {
+        if (state.selectedDie !== null) {
+          dieVal = state.selectedDie; useShield = state.isShield; usedPicker = 'player';
+        } else if (state.selectedOppDie !== null) {
+          dieVal = state.selectedOppDie; useShield = state.isOppShield; usedPicker = 'opp';
+        }
+      } else {
+        if (state.selectedOppDie !== null) {
+          dieVal = state.selectedOppDie; useShield = state.isOppShield; usedPicker = 'opp';
+        } else if (state.selectedDie !== null) {
+          dieVal = state.selectedDie; useShield = state.isShield; usedPicker = 'player';
+        }
+      }
+      if (dieVal == null) {
+        alert('왼쪽 또는 오른쪽에서 주사위 값을 선택하세요!');
         return;
       }
-      const useShield = side === 'player' ? state.isShield : state.isOppShield;
       rows[row].push({ value: dieVal, shield: useShield });
 
-      // 배치 후 해당 피커 선택 해제
-      if (side === 'player') {
+      // 배치 후 사용한 피커 선택 해제
+      if (usedPicker === 'player') {
         state.selectedDie = null;
         state.isShield = false;
         document.getElementById('shieldToggle').classList.remove('active');
