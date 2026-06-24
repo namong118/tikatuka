@@ -96,10 +96,6 @@ header p { font-size: .78rem; color: var(--text-dim); margin-top: 4px; letter-sp
 }
 .shield-toggle.active { border-color: var(--shield); color: var(--shield); box-shadow: 0 0 8px rgba(255,213,79,.2); }
 
-.mode-toggle { display: flex; background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
-.mode-btn { padding: 8px 14px; font-size: .82rem; cursor: pointer; border: none; background: transparent; color: var(--text-dim); transition: background .15s, color .15s; font-family: inherit; }
-.mode-btn.active-player { background: var(--player-dim); color: var(--player); }
-.mode-btn.active-opp    { background: var(--opp-dim); color: var(--opp); }
 
 .btn-group { display: flex; gap: 6px; margin-left: auto; }
 .btn { padding: 9px 16px; border-radius: 7px; border: none; font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; transition: opacity .15s, background .15s; }
@@ -347,14 +343,6 @@ body.bonus-mode .die-slot.empty {
       </div>
     </div>
 
-    <div class="control-group">
-      <div class="control-label">배치 대상</div>
-      <div class="mode-toggle">
-        <button class="mode-btn active-player" id="modePlayer" onclick="setMode('player')">내 필드</button>
-        <button class="mode-btn" id="modeOpp" onclick="setMode('opp')">상대 필드</button>
-      </div>
-    </div>
-
     <div class="btn-group">
       <button class="btn btn-recommend" onclick="doRecommend()">추천 받기</button>
       <button class="btn btn-reset" onclick="resetGame()">게임 리셋</button>
@@ -402,7 +390,7 @@ body.bonus-mode .die-slot.empty {
   <!-- HOW TO USE -->
   <div class="how-to">
     <strong>사용법</strong><br>
-    ① 주사위 값 선택 → 배치 대상(내 필드/상대 필드) → <strong>추천 받기</strong> 또는 슬롯 직접 클릭<br>
+    ① 주사위 값 선택 → <strong>추천 받기</strong> 또는 원하는 슬롯 직접 클릭 (내/상대 필드 구분 없이)<br>
     ② 슬롯 <strong>우클릭</strong>으로 주사위 제거 &nbsp;|&nbsp; 실드 주사위는 🛡 선택 후 배치<br>
     ③ 알까기 발동 시 → <strong>알까기 발동</strong> 버튼 클릭 → 보너스 실드 주사위를 어느 필드에나 배치<br>
     <br>
@@ -448,7 +436,6 @@ const state = {
   opponentRows:  [[], [], []],
   selectedDie:   null,
   isShield:      false,
-  mode:          'player',
   recommendedRow: null,
   alkkagiBonus:  false,   // true = 보너스 실드 주사위 배치 모드
 };
@@ -736,16 +723,6 @@ function makeSlot(side, row, slotIdx) {
         return;
       }
 
-      // 일반 모드: 배치 대상 체크
-      if (state.mode === 'player' && side !== 'player') {
-        alert('내 필드 모드입니다. 모드를 변경하거나 내 필드에 배치하세요.');
-        return;
-      }
-      if (state.mode === 'opp' && side !== 'opp') {
-        alert('상대 필드 모드입니다. 모드를 변경하거나 상대 필드에 배치하세요.');
-        return;
-      }
-
       rows[row].push({ value: state.selectedDie, shield: state.isShield });
       state.recommendedRow = null;
       render();
@@ -808,12 +785,6 @@ function toggleShield() {
   state.isShield = !state.isShield;
   document.getElementById('shieldToggle').classList.toggle('active', state.isShield);
   document.getElementById('shieldLabel').textContent = state.isShield ? '실드' : '일반';
-}
-
-function setMode(mode) {
-  state.mode = mode;
-  document.getElementById('modePlayer').className = 'mode-btn' + (mode === 'player' ? ' active-player' : '');
-  document.getElementById('modeOpp').className    = 'mode-btn' + (mode === 'opp'    ? ' active-opp'    : '');
 }
 
 // ─── ALKKAGI TRIGGER ─────────────────────────────────────────────────────────
