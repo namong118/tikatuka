@@ -815,12 +815,15 @@ function selectDie(v) {
 
 // ─── 보너스 실드 주사위 배치 추천 ────────────────────────────────────────────
 
-// 상대가 이 줄에서 낼 수 있는 실제 최고점 (1~6 전부 시뮬레이션)
+// 상대가 이 줄에서 낼 수 있는 실제 최고점 — 남은 슬롯을 전부 채웠을 때 기준
 function calcOppBestPossible(oRow) {
   if (oRow.length >= 3) return rowScore(oRow);
-  let best = rowScore(oRow); // 아무것도 안 넣은 현재 점수 기준
+  const slotsLeft = 3 - oRow.length;
+  let best = rowScore(oRow);
+  // 남은 칸을 같은 눈으로 채울 때 (더블/트리플 보너스 포함) vs 최대 단독값(6)
   for (let v = 1; v <= 6; v++) {
-    const s = rowScore([...oRow, { value: v, shield: false }]);
+    const filled = [...oRow, ...Array(slotsLeft).fill({ value: v, shield: false })];
+    const s = rowScore(filled);
     if (s > best) best = s;
   }
   return best;
