@@ -98,42 +98,62 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .btn-next-turn:hover { border-color: var(--gold); color: var(--gold); }
 .btn-next-turn:disabled { opacity: .3; cursor: default; }
 
-/* ─── CONTROL BAR ─── */
-.control-bar {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+/* ─── MAIN GRID ─── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 162px 1fr 162px;
+  gap: 12px;
+  align-items: start;
 }
-.control-group { display: flex; flex-direction: column; gap: 5px; }
-.control-label  { font-size: .68rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); }
-.die-picker     { display: flex; gap: 5px; }
+
+.board-center { display: flex; flex-direction: column; gap: 10px; }
+
+.player-panel, .opp-panel {
+  display: flex; flex-direction: column; gap: 7px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 10px;
+}
+
+.panel-title {
+  font-size: .64rem; text-transform: uppercase; letter-spacing: 1.5px;
+  font-weight: 700; text-align: center; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title.player { color: var(--player); }
+.panel-title.opp    { color: var(--opp); }
+
+.panel-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+.opp-panel-note {
+  font-size: .68rem; color: var(--text-dim); text-align: center;
+  line-height: 1.6; padding-top: 4px;
+}
+
+/* ─── DIE BUTTONS ─── */
+.die-picker-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+}
 
 .die-btn {
-  width: 44px; height: 44px; border-radius: 7px; border: 2px solid var(--border);
+  width: 100%; aspect-ratio: 1; border-radius: 7px; border: 2px solid var(--border);
   background: var(--bg2); cursor: pointer; padding: 0; overflow: hidden;
   transition: border-color .15s, box-shadow .15s;
 }
 .die-btn canvas { display: block; width: 100%; height: 100%; }
 .die-btn:hover  { border-color: #4a6080; background: var(--surface2); }
-.die-btn.active { border-color: var(--gold); box-shadow: 0 0 10px var(--gold-glow); }
+.die-btn.active     { border-color: var(--gold); box-shadow: 0 0 10px var(--gold-glow); }
+.die-btn.active-opp { border-color: var(--opp);  box-shadow: 0 0 10px rgba(224,72,72,.35); }
 
-.shield-toggle {
-  display: flex; align-items: center; gap: 8px; background: var(--bg2);
-  border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
-  cursor: pointer; font-size: .85rem; color: var(--text-dim);
+/* ─── SIDE PANEL TOGGLES & BUTTONS ─── */
+.shield-toggle, .tajja-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 7px 8px;
+  cursor: pointer; font-size: .8rem; color: var(--text-dim);
   transition: border-color .15s, color .15s; user-select: none;
 }
 .shield-toggle.active { border-color: var(--shield); color: var(--shield); }
-
-.tajja-toggle {
-  display: flex; align-items: center; gap: 8px; background: var(--bg2);
-  border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
-  cursor: pointer; font-size: .85rem; color: var(--text-dim);
-  transition: border-color .15s, color .15s; user-select: none;
-}
-.tajja-toggle.active { border-color: var(--bonus); color: var(--bonus); }
+.tajja-toggle.active  { border-color: var(--bonus);  color: var(--bonus); }
 
 .tajja-analysis {
   width: 100%; background: rgba(192,122,255,.07); border: 1px solid rgba(192,122,255,.3);
@@ -151,8 +171,7 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .tajja-detail { color: var(--text-dim); line-height: 1.7; }
 .tajja-detail strong { color: var(--text); }
 
-.btn-group { display: flex; gap: 6px; margin-left: auto; }
-.btn { padding: 9px 16px; border-radius: 7px; border: none; font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+.btn { width: 100%; padding: 9px 8px; border-radius: 7px; border: none; font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
 .btn:hover { opacity: .85; }
 .btn-recommend { background: var(--gold); color: #000; }
 .btn-reset     { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
@@ -315,12 +334,19 @@ body.bonus-mode .die-slot.empty {
 .how-to { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; font-size: .76rem; color: var(--text-dim); line-height: 1.85; }
 .how-to strong { color: var(--text); }
 
-@media (max-width: 580px) {
-  .die-slot  { width: 38px; height: 38px; }
-  .die-btn   { width: 38px; height: 38px; }
-  .row-card  { grid-template-columns: 1fr 60px 1fr; gap: 5px; }
-  .board-headers { grid-template-columns: 1fr 60px 1fr; gap: 5px; }
-  .bridge-val { font-size: .9rem; }
+@media (max-width: 780px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .player-panel, .opp-panel { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .panel-title { width: 100%; }
+  .die-picker-grid { grid-template-columns: repeat(6, 1fr); flex: 1 1 auto; }
+  .panel-divider { display: none; }
+  .opp-panel-note { display: none; }
+}
+@media (max-width: 520px) {
+  .die-slot  { width: 36px; height: 36px; }
+  .row-card  { grid-template-columns: 1fr 56px 1fr; gap: 4px; }
+  .board-headers { grid-template-columns: 1fr 56px 1fr; gap: 4px; }
+  .bridge-val { font-size: .85rem; }
 }
 </style>
 </head>
@@ -352,55 +378,57 @@ body.bonus-mode .die-slot.empty {
     <button class="btn-next-turn" id="btnNextTurn" onclick="nextTurn()" disabled>다음 턴 →</button>
   </div>
 
-  <!-- CONTROLS -->
-  <div class="control-bar">
-    <div class="control-group">
-      <div class="control-label">주사위 값 선택</div>
-      <div class="die-picker" id="diePicker"></div>
-    </div>
+  <!-- MAIN GRID -->
+  <div class="main-grid">
 
-    <div class="control-group">
-      <div class="control-label">실드</div>
+    <!-- LEFT: 내 컨트롤 -->
+    <div class="player-panel">
+      <div class="panel-title player">내 주사위</div>
+      <div class="die-picker-grid" id="diePicker"></div>
+      <div class="panel-divider"></div>
       <div class="shield-toggle" id="shieldToggle" onclick="toggleShield()">
         <span>🛡</span>
         <span id="shieldLabel">일반</span>
       </div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-label">타짜의 손놀림</div>
       <div class="tajja-toggle active" id="tajjaToggle" onclick="toggleTajja()">
         <span>🃏</span>
         <span id="tajjaLabel">보유</span>
       </div>
-    </div>
-
-    <div class="btn-group">
+      <div class="panel-divider"></div>
       <button class="btn btn-recommend" onclick="doRecommend()">추천 받기</button>
       <button class="btn btn-reset"     onclick="resetGame()">리셋</button>
     </div>
-  </div>
 
-  <!-- BONUS BANNER -->
-  <div class="bonus-banner" id="bonusBanner">
-    🛡 보너스 실드 주사위 배치 중
-    <small>주사위 값을 선택하면 최적 배치를 자동으로 추천합니다 (내 필드 / 상대 필드 모두 가능)</small>
-  </div>
+    <!-- CENTER: 보드 -->
+    <div class="board-center">
+      <div class="bonus-banner" id="bonusBanner">
+        🛡 보너스 실드 주사위 배치 중
+        <small>내 필드 또는 상대 필드의 빈 칸에 배치 · 배치 후 상대 턴</small>
+      </div>
+      <div class="board-headers" id="boardHeaders">
+        <div class="bh-cell bh-player" id="bhPlayer">내 필드</div>
+        <div class="bh-cell bh-center"></div>
+        <div class="bh-cell bh-opp"    id="bhOpp">상대 필드</div>
+      </div>
+      <div class="board-section" id="boardSection"></div>
+    </div>
 
-  <!-- RECOMMENDATION -->
+    <!-- RIGHT: 상대 컨트롤 -->
+    <div class="opp-panel">
+      <div class="panel-title opp">상대 주사위</div>
+      <div class="die-picker-grid" id="oppDiePicker"></div>
+      <div class="panel-divider"></div>
+      <div class="opp-panel-note">선택 후 상대 필드<br>빈 칸 클릭으로 배치</div>
+    </div>
+
+  </div><!-- /main-grid -->
+
+  <!-- RECOMMENDATION (full width) -->
   <div class="rec-panel" id="recPanel">
     <div class="rec-header">전략 추천</div>
-    <div class="rec-main" id="recMain">주사위 값을 선택하고 <strong>추천 받기</strong>를 눌러주세요.</div>
+    <div class="rec-main" id="recMain">내 주사위 값(왼쪽)을 선택하고 <strong>추천 받기</strong>를 눌러주세요.</div>
     <div class="rec-options" id="recOptions"></div>
   </div>
-
-  <!-- BOARD -->
-  <div class="board-headers" id="boardHeaders">
-    <div class="bh-cell bh-player" id="bhPlayer">내 필드</div>
-    <div class="bh-cell bh-center"></div>
-    <div class="bh-cell bh-opp"    id="bhOpp">상대 필드</div>
-  </div>
-  <div class="board-section" id="boardSection"></div>
 
   <!-- SCOREBOARD -->
   <div class="scoreboard">
@@ -459,7 +487,8 @@ function drawDie(canvas, value, color, size) {
 const state = {
   playerRows:    [[], [], []],   // each die: { value, shield }
   opponentRows:  [[], [], []],
-  selectedDie:   null,
+  selectedDie:   null,   // 내 주사위 (왼쪽 피커)
+  selectedOppDie: null,  // 상대 주사위 (오른쪽 피커)
   isShield:      false,
   recommendedRow: null,
   alkkagiBonus:  false,
@@ -678,31 +707,36 @@ function makeSlot(side, row, slotIdx) {
     slot.className = 'die-slot empty';
     slot.title = '클릭해서 배치';
     slot.addEventListener('click', () => {
-      if (state.selectedDie === null) { alert('먼저 주사위 값을 선택하세요!'); return; }
-
       if (state.alkkagiBonus) {
-        // 보너스 실드 주사위 — 내 필드 or 상대 필드 어디든 배치 후 상대 턴
+        // 보너스 실드 주사위 — 내 필드 or 상대 필드 어디든, 내 주사위 피커 값 사용
+        if (state.selectedDie === null) { alert('왼쪽에서 보너스 주사위 값을 선택하세요!'); return; }
         rows[row].push({ value: state.selectedDie, shield: true });
         exitBonusMode();
         state.selectedDie = null;
         state.isShield = false;
         document.getElementById('shieldToggle').classList.remove('active');
         document.getElementById('shieldLabel').textContent = '일반';
-        document.querySelectorAll('.die-btn').forEach(b => {
+        document.querySelectorAll('#diePicker .die-btn').forEach(b => {
           b.classList.remove('active');
           drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
         });
         document.getElementById('recPanel').className = 'rec-panel';
-        document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+        document.getElementById('recMain').textContent = '내 주사위 값(왼쪽)을 선택하고 추천 받기를 눌러주세요.';
         document.getElementById('recOptions').innerHTML = '';
         nextTurn();
         return;
       }
 
-      rows[row].push({ value: state.selectedDie, shield: state.isShield });
+      // 일반 배치: 내 슬롯은 selectedDie, 상대 슬롯은 selectedOppDie
+      const dieVal = side === 'player' ? state.selectedDie : state.selectedOppDie;
+      if (dieVal === null) {
+        alert(side === 'player' ? '왼쪽에서 내 주사위 값을 선택하세요!' : '오른쪽에서 상대 주사위 값을 선택하세요!');
+        return;
+      }
+      rows[row].push({ value: dieVal, shield: state.isShield });
       state.recommendedRow = null;
       document.getElementById('recPanel').className = 'rec-panel';
-      document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+      document.getElementById('recMain').textContent = '내 주사위 값(왼쪽)을 선택하고 추천 받기를 눌러주세요.';
       document.getElementById('recOptions').innerHTML = '';
       render();
     });
@@ -793,15 +827,37 @@ function initDiePicker() {
   }
 }
 
+function initOppDiePicker() {
+  const picker = document.getElementById('oppDiePicker');
+  for (let v = 1; v <= 6; v++) {
+    const btn = document.createElement('button');
+    btn.className = 'die-btn'; btn.title = String(v); btn.dataset.val = v;
+    const cv = document.createElement('canvas');
+    drawDie(cv, v, '#a05858', 40);
+    btn.appendChild(cv);
+    btn.addEventListener('click', () => selectOppDie(v));
+    picker.appendChild(btn);
+  }
+}
+
 function selectDie(v) {
   state.selectedDie = v;
-  document.querySelectorAll('.die-btn').forEach(b => {
+  document.querySelectorAll('#diePicker .die-btn').forEach(b => {
     const on = +b.dataset.val === v;
     b.classList.toggle('active', on);
     drawDie(b.querySelector('canvas'), +b.dataset.val, on ? '#e8a020' : '#a08848', 40);
   });
   // 보너스 모드일 때 주사위 선택 즉시 추천
   if (state.alkkagiBonus) doRecommendBonus(v);
+}
+
+function selectOppDie(v) {
+  state.selectedOppDie = v;
+  document.querySelectorAll('#oppDiePicker .die-btn').forEach(b => {
+    const on = +b.dataset.val === v;
+    b.classList.toggle('active-opp', on);
+    drawDie(b.querySelector('canvas'), +b.dataset.val, on ? '#ff6868' : '#a05858', 40);
+  });
 }
 
 // ─── 보너스 실드 주사위 배치 추천 ────────────────────────────────────────────
@@ -1027,9 +1083,9 @@ function triggerAlkkagi(rowIdx) {
 
   // Reset die selection for bonus die
   state.selectedDie = null;
-  document.querySelectorAll('.die-btn').forEach(b => {
+  document.querySelectorAll('#diePicker .die-btn').forEach(b => {
     b.classList.remove('active');
-    drawDie(b.querySelector('canvas'), +b.dataset.val, '#6090c0', 40);
+    drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
   });
 
   // Reset recommendation — 주사위 선택 시 자동 추천됨
@@ -1173,21 +1229,35 @@ function resetGame() {
   state.playerRows    = [[], [], []];
   state.opponentRows  = [[], [], []];
   state.recommendedRow = null;
+  state.selectedDie   = null;
+  state.selectedOppDie = null;
+  state.isShield      = false;
   state.turnCount     = 1;
   state.currentTurn   = state.firstTurn || 'player';
   state.hasTajja      = true;
   exitBonusMode();
 
+  document.getElementById('shieldToggle').classList.remove('active');
+  document.getElementById('shieldLabel').textContent = '일반';
   document.getElementById('tajjaToggle').classList.add('active');
   document.getElementById('tajjaLabel').textContent = '보유';
+  document.querySelectorAll('#diePicker .die-btn').forEach(b => {
+    b.classList.remove('active');
+    drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
+  });
+  document.querySelectorAll('#oppDiePicker .die-btn').forEach(b => {
+    b.classList.remove('active-opp');
+    drawDie(b.querySelector('canvas'), +b.dataset.val, '#a05858', 40);
+  });
   document.getElementById('recPanel').className  = 'rec-panel';
-  document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+  document.getElementById('recMain').textContent = '내 주사위 값(왼쪽)을 선택하고 추천 받기를 눌러주세요.';
   document.getElementById('recOptions').innerHTML = '';
   render();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 initDiePicker();
+initOppDiePicker();
 render();
 </script>
 </body>
