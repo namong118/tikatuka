@@ -168,17 +168,6 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .bonus-banner small { display: block; font-weight: 400; font-size: .76rem; margin-top: 3px; color: #d0aaff; }
 @keyframes pulse-bonus { 0%,100% { box-shadow: 0 0 0 0 rgba(176,106,255,.3); } 50% { box-shadow: 0 0 0 6px rgba(176,106,255,0); } }
 
-/* ─── EXTRA TURN BANNER ─── */
-.extra-turn-banner {
-  display: none; background: rgba(255,157,47,.1); border: 1px solid var(--alkkagi);
-  border-radius: 10px; padding: 12px 16px; font-size: .88rem; font-weight: 700;
-  color: var(--alkkagi); text-align: center;
-  animation: pulse-extra 1.5s ease-in-out infinite;
-}
-.extra-turn-banner.show { display: block; }
-.extra-turn-banner small { display: block; font-weight: 400; font-size: .76rem; margin-top: 3px; color: #ffc070; }
-@keyframes pulse-extra { 0%,100% { box-shadow: 0 0 0 0 rgba(255,157,47,.3); } 50% { box-shadow: 0 0 0 6px rgba(255,157,47,0); } }
-
 /* ─── RECOMMENDATION ─── */
 .rec-panel {
   background: var(--bg2); border: 1px solid var(--border);
@@ -398,12 +387,6 @@ body.bonus-mode .die-slot.empty {
     <small>주사위 값을 선택하면 최적 배치를 자동으로 추천합니다 (내 필드 / 상대 필드 모두 가능)</small>
   </div>
 
-  <!-- EXTRA TURN BANNER -->
-  <div class="extra-turn-banner" id="extraTurnBanner">
-    ⚡ 알까기 보너스 — 한 번 더 굴리세요!
-    <small>알까기 발동 시 이번 턴에 주사위를 한 번 더 배치합니다 · 상대 턴은 아직 아닙니다</small>
-  </div>
-
   <!-- RECOMMENDATION -->
   <div class="rec-panel" id="recPanel">
     <div class="rec-header">전략 추천</div>
@@ -480,7 +463,6 @@ const state = {
   isShield:      false,
   recommendedRow: null,
   alkkagiBonus:  false,
-  alkkagiExtraTurn: false,       // 알까기 후 보너스 턴 (한 번 더 배치)
   firstTurn:     null,           // 'player' | 'opp'
   currentTurn:   'player',
   turnCount:     1,
@@ -699,17 +681,26 @@ function makeSlot(side, row, slotIdx) {
       if (state.selectedDie === null) { alert('먼저 주사위 값을 선택하세요!'); return; }
 
       if (state.alkkagiBonus) {
-        // 보너스 실드 주사위 — 어느 필드든 배치 가능
+        // 보너스 실드 주사위 — 내 필드 or 상대 필드 어디든 배치 후 상대 턴
         rows[row].push({ value: state.selectedDie, shield: true });
         exitBonusMode();
-        enterExtraTurn(); // 알까기 후 한 번 더 굴림
-        render();
+        state.selectedDie = null;
+        state.isShield = false;
+        document.getElementById('shieldToggle').classList.remove('active');
+        document.getElementById('shieldLabel').textContent = '일반';
+        document.querySelectorAll('.die-btn').forEach(b => {
+          b.classList.remove('active');
+          drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
+        });
+        document.getElementById('recPanel').className = 'rec-panel';
+        document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
+        document.getElementById('recOptions').innerHTML = '';
+        nextTurn();
         return;
       }
 
       rows[row].push({ value: state.selectedDie, shield: state.isShield });
       state.recommendedRow = null;
-      if (state.alkkagiExtraTurn) exitExtraTurn(); // 보너스 턴 소진
       document.getElementById('recPanel').className = 'rec-panel';
       document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
       document.getElementById('recOptions').innerHTML = '';
@@ -765,7 +756,7 @@ function renderTurn() {
   text.className = 'turn-text ' + (isPlayer ? 'player' : 'opp');
   text.textContent = isPlayer ? '내 턴' : '상대 턴';
   count.textContent = `(${state.turnCount}번째 턴)`;
-  btn.disabled = state.alkkagiBonus || state.alkkagiExtraTurn;
+  btn.disabled = state.alkkagiBonus;
 
   document.getElementById('bhPlayer').classList.toggle('active-turn', isPlayer);
   document.getElementById('bhOpp').classList.toggle('active-turn', !isPlayer);
@@ -1057,27 +1048,6 @@ function exitBonusMode() {
   document.getElementById('bonusBanner').classList.remove('show');
 }
 
-function enterExtraTurn() {
-  state.alkkagiExtraTurn = true;
-  state.selectedDie = null;
-  state.isShield = false;
-  document.getElementById('shieldToggle').classList.remove('active');
-  document.getElementById('shieldLabel').textContent = '일반';
-  document.querySelectorAll('.die-btn').forEach(b => {
-    b.classList.remove('active');
-    drawDie(b.querySelector('canvas'), +b.dataset.val, '#a08848', 40);
-  });
-  document.getElementById('extraTurnBanner').classList.add('show');
-  document.getElementById('recPanel').className = 'rec-panel';
-  document.getElementById('recMain').innerHTML = '⚡ 보너스 턴! 주사위 값을 선택하고 <strong>추천 받기</strong>를 눌러주세요.';
-  document.getElementById('recOptions').innerHTML = '';
-}
-
-function exitExtraTurn() {
-  state.alkkagiExtraTurn = false;
-  document.getElementById('extraTurnBanner').classList.remove('show');
-}
-
 // ─── RECOMMEND ────────────────────────────────────────────────────────────
 function doRecommend() {
   if (state.selectedDie === null) { alert('먼저 주사위 값(1~6)을 선택하세요!'); return; }
@@ -1207,7 +1177,6 @@ function resetGame() {
   state.currentTurn   = state.firstTurn || 'player';
   state.hasTajja      = true;
   exitBonusMode();
-  exitExtraTurn();
 
   document.getElementById('tajjaToggle').classList.add('active');
   document.getElementById('tajjaLabel').textContent = '보유';
