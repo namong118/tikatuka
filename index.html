@@ -531,6 +531,11 @@ function getRecommendations(dieValue) {
         if (ps > rowScore(state.opponentRows[i])) wins++;
       }
 
+      // 상대가 이 줄에서 낼 수 있는 실제 최고점
+      const oppBestPossible = calcOppBestPossible(state.opponentRows[r]);
+      const competitiveGap  = oppBestPossible - newScore; // 낮을수록 유리
+      const oppSlotsLeft    = 3 - state.opponentRows[r].length;
+
       let heuristic = gain * 2;
       if (sameCount === 3) heuristic += 35;
       else if (sameCount === 2) heuristic += 15;
@@ -538,6 +543,14 @@ function getRecommendations(dieValue) {
       else if (diff === 0) heuristic += 4;
       heuristic += wins * 7;
       if (state.opponentRows[r].length === 3 && oScore >= maxRowScore(newDice)) heuristic -= 20;
+
+      // 상대 최고점 대비 경쟁력: 차이가 작을수록(이기거나 박빙) 가중치 추가
+      if (newScore >= oppBestPossible)   heuristic += 30; // 내가 이미 이길 수 있음
+      else if (competitiveGap <= 4)      heuristic += 18; // 박빙 — 조금만 더하면 이김
+      else if (competitiveGap <= 8)      heuristic += 10;
+      // 상대 슬롯이 적을수록 (줄이 굳어질수록) 전략적 가치 높음
+      if (oppSlotsLeft === 1)            heuristic += 12; // 상대 마지막 슬롯 → 천장 확정
+      else if (oppSlotsLeft === 0)       heuristic += 0;  // 이미 확정 (위에서 처리)
 
       let bonus = '';
       if (sameCount === 3)           bonus = '🔥 트리플 완성!';
