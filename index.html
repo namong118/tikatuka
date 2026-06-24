@@ -561,19 +561,20 @@ function getRecommendations(dieValue) {
       const newOppScore  = rowScore(newOppRow);
       const oppLoss      = oldOppScore - newOppScore;
       const removedCount = oppMatchingDice.length;
-      const expectedBonus   = 3.5; // 보너스 실드 주사위 평균값
-      const extraTurnValue  = 8.0; // 알까기 후 추가 턴 가치 (주사위 1번 더 놓는 기대값)
 
-      const simOpp = state.opponentRows.map((row, i) => i === r ? newOppRow : row);
+      // 알까기 후 상태에서 보너스 주사위 기대 가치 계산 (실제 보드 반영)
+      const postOppRows    = state.opponentRows.map((row, i) => i === r ? newOppRow : row);
+      const expectedBonus  = calcExpectedBonusValue(postOppRows);
+
       let winsAfter = 0;
       for (let i = 0; i < 3; i++) {
-        if (rowScore(state.playerRows[i]) > rowScore(simOpp[i])) winsAfter++;
+        if (rowScore(state.playerRows[i]) > rowScore(postOppRows[i])) winsAfter++;
       }
 
-      const totalBenefit = oppLoss + expectedBonus + extraTurnValue;
-      let heuristic = totalBenefit * 2.5 + winsAfter * 8;
-      if (removedCount >= 2) heuristic += 28;
-      if (rowScore(state.playerRows[r]) > newOppScore) heuristic += 12;
+      const totalBenefit = oppLoss + expectedBonus;
+      let heuristic = oppLoss * 3 + expectedBonus * 1.5 + winsAfter * 10;
+      if (removedCount >= 2) heuristic += 25;          // 더블/트리플 파괴
+      if (rowScore(state.playerRows[r]) > newOppScore) heuristic += 15; // 이미 해당 줄 우세
 
       options.push({ row: r, type: 'alkkagi', oppLoss, removedCount, newOppScore, totalBenefit, winsAfter, heuristic });
 
@@ -951,13 +952,54 @@ function calcOppBestPossible(oRow) {
   if (oRow.length >= 3) return rowScore(oRow);
   const slotsLeft = 3 - oRow.length;
   let best = rowScore(oRow);
-  // 남은 칸을 같은 눈으로 채울 때 (더블/트리플 보너스 포함) vs 최대 단독값(6)
   for (let v = 1; v <= 6; v++) {
     const filled = [...oRow, ...Array(slotsLeft).fill({ value: v, shield: false })];
     const s = rowScore(filled);
     if (s > best) best = s;
   }
   return best;
+}
+
+// 알까기 후 상태에서 보너스 실드 주사위의 기대 전략 가치 계산
+// postOppRows: 알까기로 상대 주사위 제거 후의 상대 필드 (3행 배열)
+function calcExpectedBonusValue(postOppRows) {
+  let total = 0;
+  for (let v = 1; v <= 6; v++) {
+    let best = 0;
+
+    // 내 필드 배치 시뮬레이션
+    for (let r = 0; r < 3; r++) {
+      if (state.playerRows[r].length >= 3) continue;
+      const newPRow  = [...state.playerRows[r], { value: v, shield: true }];
+      const newPS    = rowScore(newPRow);
+      const oS       = rowScore(postOppRows[r]);
+      const oldPS    = rowScore(state.playerRows[r]);
+      let val = (newPS - oldPS) * 2;                  // 점수 이득
+      if (newPS > oS)  val += 20;                     // 줄 승리
+      if (oldPS <= oS && newPS > oS) val += 10;       // 역전 보너스
+      const same = newPRow.filter(d => d.value === v).length;
+      if (same === 3) val += 30;
+      else if (same === 2) val += 12;
+      best = Math.max(best, val);
+    }
+
+    // 상대 필드 배치 시뮬레이션 (차단)
+    for (let r = 0; r < 3; r++) {
+      if (postOppRows[r].length >= 3) continue;
+      const prevSame = postOppRows[r].filter(d => d.value === v).length;
+      if (prevSame >= 1) continue;                    // 상대 콤보 완성 → 배치 불리, 건너뜀
+      const newORow    = [...postOppRows[r], { value: v, shield: true }];
+      const newOS      = rowScore(newORow);
+      const bestPoss   = calcOppBestPossible(postOppRows[r]);
+      const blocking   = bestPoss - newOS;
+      let val = blocking * 1.8;
+      if (blocking > 8) val += 10;
+      best = Math.max(best, val);
+    }
+
+    total += best;
+  }
+  return total / 6;  // 평균 기대 가치
 }
 
 function getBonusDieRecommendations(dieValue) {
@@ -1282,10 +1324,11 @@ function doRecommend() {
 
     if (opt.type === 'alkkagi') {
       const removed = opt.removedCount === 2 ? '더블 파괴' : opt.removedCount === 3 ? '트리플 파괴' : `${opt.removedCount}개 제거`;
+      const bonusEV = (opt.totalBenefit - opt.oppLoss).toFixed(1);
       detail.innerHTML =
         `상대 점수 손실: <strong>-${opt.oppLoss}점</strong> (${removed})<br>` +
-        `보너스 실드 주사위 +3.5 &nbsp;|&nbsp; 추가 턴 가치 +8.0<br>` +
-        `총 이득: <strong>${opt.totalBenefit.toFixed(1)}점</strong> &nbsp;|&nbsp; 승리 줄: ${opt.winsAfter}개`;
+        `보너스 주사위 기대 가치: <strong>+${bonusEV}점</strong><br>` +
+        `총 이득: <strong>${opt.totalBenefit.toFixed(1)}점</strong> &nbsp;|&nbsp; 알까기 후 승리 줄: ${opt.winsAfter}개`;
     } else {
       detail.innerHTML =
         `내 점수 → <strong>${opt.newScore}</strong> &nbsp;|&nbsp; 상대: ${opt.oScore}<br>` +
