@@ -561,10 +561,10 @@ function renderBoard() {
     if (alkHighlight)           cardClass += ' alkkagi-row';
     card.className = cardClass;
 
-    // Player (left)
+    // Player (left) — 오른쪽부터 채워지도록 역순 렌더
     const pl = document.createElement('div');
     pl.className = 'dice-row pr';
-    for (let s = 0; s < 3; s++) pl.appendChild(makeSlot('player', r, s));
+    for (let s = 2; s >= 0; s--) pl.appendChild(makeSlot('player', r, s));
 
     // Bridge (center)
     const br = document.createElement('div');
