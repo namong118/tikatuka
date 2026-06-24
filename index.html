@@ -127,6 +127,30 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 }
 .shield-toggle.active { border-color: var(--shield); color: var(--shield); }
 
+.tajja-toggle {
+  display: flex; align-items: center; gap: 8px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
+  cursor: pointer; font-size: .85rem; color: var(--text-dim);
+  transition: border-color .15s, color .15s; user-select: none;
+}
+.tajja-toggle.active { border-color: var(--bonus); color: var(--bonus); }
+
+.tajja-analysis {
+  width: 100%; background: rgba(192,122,255,.07); border: 1px solid rgba(192,122,255,.3);
+  border-radius: 7px; padding: 9px 12px; margin-top: 4px; font-size: .78rem;
+}
+.tajja-header {
+  display: flex; align-items: center; gap: 8px; font-weight: 700;
+  color: var(--bonus); margin-bottom: 5px;
+}
+.tajja-verdict {
+  font-size: .62rem; padding: 2px 7px; border-radius: 3px; font-weight: 700; letter-spacing: .3px;
+}
+.tajja-verdict.use  { background: rgba(255,157,47,.2);  color: var(--alkkagi); }
+.tajja-verdict.save { background: rgba(76,217,138,.15); color: var(--win); }
+.tajja-detail { color: var(--text-dim); line-height: 1.7; }
+.tajja-detail strong { color: var(--text); }
+
 .btn-group { display: flex; gap: 6px; margin-left: auto; }
 .btn { padding: 9px 16px; border-radius: 7px; border: none; font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
 .btn:hover { opacity: .85; }
@@ -354,6 +378,14 @@ body.bonus-mode .die-slot.empty {
       </div>
     </div>
 
+    <div class="control-group">
+      <div class="control-label">타짜의 손놀림</div>
+      <div class="tajja-toggle active" id="tajjaToggle" onclick="toggleTajja()">
+        <span>🃏</span>
+        <span id="tajjaLabel">보유</span>
+      </div>
+    </div>
+
     <div class="btn-group">
       <button class="btn btn-recommend" onclick="doRecommend()">추천 받기</button>
       <button class="btn btn-reset"     onclick="resetGame()">리셋</button>
@@ -452,6 +484,7 @@ const state = {
   firstTurn:     null,           // 'player' | 'opp'
   currentTurn:   'player',
   turnCount:     1,
+  hasTajja:      true,           // 타짜의 손놀림 스킬 보유 여부 (게임당 1회)
 };
 
 // ─── SCORE LOGIC ───────────────────────────────────────────────────────────
@@ -960,6 +993,32 @@ function toggleShield() {
   document.getElementById('shieldLabel').textContent = state.isShield ? '실드' : '일반';
 }
 
+function toggleTajja() {
+  state.hasTajja = !state.hasTajja;
+  document.getElementById('tajjaToggle').classList.toggle('active', state.hasTajja);
+  document.getElementById('tajjaLabel').textContent = state.hasTajja ? '보유' : '사용됨';
+}
+
+// 타짜의 손놀림: 현재 주사위 대비 다른 눈이 나왔을 때 기대 이득 계산
+function calcSkillAnalysis(currentDie) {
+  const currentOpts = getRecommendations(currentDie).filter(o => o.type !== 'full');
+  const currentBest = currentOpts.length ? currentOpts[0].heuristic : -999;
+
+  const alternatives = [];
+  for (let w = 1; w <= 6; w++) {
+    if (w === currentDie) continue;
+    const opts = getRecommendations(w).filter(o => o.type !== 'full');
+    if (!opts.length) continue;
+    const bestH = opts[0].heuristic;
+    alternatives.push({ die: w, heuristic: bestH, gain: bestH - currentBest });
+  }
+  alternatives.sort((a, b) => b.gain - a.gain);
+
+  // 기대 이득 = 나올 수 있는 6가지 눈 중 더 나은 경우만 합산 / 6
+  const expectedGain = alternatives.reduce((s, a) => s + Math.max(0, a.gain), 0) / 6;
+  return { currentBest, alternatives, expectedGain };
+}
+
 // ─── ALKKAGI ─────────────────────────────────────────────────────────────
 function triggerAlkkagi(rowIdx) {
   const v = state.selectedDie;
@@ -1108,6 +1167,30 @@ function doRecommend() {
     optsCon.appendChild(div);
   });
 
+  // 타짜의 손놀림 분석
+  if (state.hasTajja) {
+    const tajja = calcSkillAnalysis(state.selectedDie);
+    const USE_THRESHOLD = 15;
+    const shouldUse = tajja.expectedGain >= USE_THRESHOLD;
+
+    const betterAlts = tajja.alternatives.filter(a => a.gain > 0).slice(0, 4);
+    const altHTML = betterAlts.length
+      ? betterAlts.map(a => `<strong>${a.die}눈</strong>(+${Math.round(a.gain)}점)`).join(' &nbsp; ')
+      : '현재 주사위가 이미 최선';
+
+    const tajjaDiv = document.createElement('div');
+    tajjaDiv.className = 'tajja-analysis';
+    tajjaDiv.innerHTML =
+      `<div class="tajja-header">🃏 타짜의 손놀림
+         <span class="tajja-verdict ${shouldUse ? 'use' : 'save'}">${shouldUse ? '지금 사용 추천' : '아직 아끼세요'}</span>
+       </div>
+       <div class="tajja-detail">
+         기대 이득 <strong>${tajja.expectedGain.toFixed(1)}점</strong>
+         &nbsp;|&nbsp; 유리한 눈: ${altHTML}
+       </div>`;
+    optsCon.appendChild(tajjaDiv);
+  }
+
   render();
 }
 
@@ -1119,9 +1202,12 @@ function resetGame() {
   state.recommendedRow = null;
   state.turnCount     = 1;
   state.currentTurn   = state.firstTurn || 'player';
+  state.hasTajja      = true;
   exitBonusMode();
   exitExtraTurn();
 
+  document.getElementById('tajjaToggle').classList.add('active');
+  document.getElementById('tajjaLabel').textContent = '보유';
   document.getElementById('recPanel').className  = 'rec-panel';
   document.getElementById('recMain').textContent = '주사위 값을 선택하고 추천 받기를 눌러주세요.';
   document.getElementById('recOptions').innerHTML = '';
