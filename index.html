@@ -742,8 +742,19 @@ function selectDie(v) {
 }
 
 // ─── 보너스 실드 주사위 배치 추천 ────────────────────────────────────────────
+
+// 상대가 이 줄에서 낼 수 있는 실제 최고점 (1~6 전부 시뮬레이션)
+function calcOppBestPossible(oRow) {
+  if (oRow.length >= 3) return rowScore(oRow);
+  let best = rowScore(oRow); // 아무것도 안 넣은 현재 점수 기준
+  for (let v = 1; v <= 6; v++) {
+    const s = rowScore([...oRow, { value: v, shield: false }]);
+    if (s > best) best = s;
+  }
+  return best;
+}
+
 function getBonusDieRecommendations(dieValue) {
-  const ROWS = ['1번 줄', '2번 줄', '3번 줄'];
   const options = [];
 
   // ── 내 필드 배치 옵션 ──
@@ -751,15 +762,13 @@ function getBonusDieRecommendations(dieValue) {
     const pRow = state.playerRows[r];
     if (pRow.length >= 3) continue;
 
-    const oldScore  = rowScore(pRow);
     const newDice   = [...pRow, { value: dieValue, shield: true }];
     const newScore  = rowScore(newDice);
-    const gain      = newScore - oldScore;
+    const gain      = newScore - rowScore(pRow);
     const oScore    = rowScore(state.opponentRows[r]);
     const diff      = newScore - oScore;
     const sameCount = newDice.filter(d => d.value === dieValue).length;
 
-    // 전체 승리 줄 수 시뮬레이션
     let wins = 0;
     for (let i = 0; i < 3; i++) {
       const ps = i === r ? newScore : rowScore(state.playerRows[i]);
@@ -788,33 +797,33 @@ function getBonusDieRecommendations(dieValue) {
     const oRow = state.opponentRows[r];
     if (oRow.length >= 3) continue;
 
-    const oldOppScore = rowScore(oRow);
+    // 상대가 이 줄에서 낼 수 있는 실제 최고점 (1~6 시뮬레이션)
+    const oppBestPossible = calcOppBestPossible(oRow);
     const newOppDice  = [...oRow, { value: dieValue, shield: true }];
     const newOppScore = rowScore(newOppDice);
-    const scoreIncrease = newOppScore - oldOppScore; // 상대 점수 증가 (낮을수록 좋음)
 
-    // 이 슬롯을 막지 않으면 상대가 최적으로 채울 수 있는 최대 점수
-    const maxIfNotBlocked = maxRowScore(oRow);
-    // 내가 막은 후 상대 최대 점수 (이미 가득 참)
-    const maxAfterBlock = newOppScore; // 슬롯 다 찼으니 더 이상 못 올림
-    const blockingValue = maxIfNotBlocked - maxAfterBlock; // 내가 막아서 방지한 점수
+    // 차단 가치 = 내가 막지 않았으면 상대가 낼 수 있는 최고점 - 내가 막은 후 점수
+    // 양수일수록 좋음: 상대 고점을 많이 낮춤
+    const blockingValue = oppBestPossible - newOppScore;
 
-    // 상대 더블/트리플 완성 여부 (내가 도와주는 꼴이면 나쁨)
-    const sameAsOpp = newOppDice.filter(d => d.value === dieValue).length;
-    const helpsOpp  = sameAsOpp >= 2; // 더블 이상 완성시켜주는 경우
+    // 내가 상대의 더블/트리플을 완성시켜주는지 확인
+    const prevSame  = oRow.filter(d => d.value === dieValue).length;
+    const newSame   = prevSame + 1;
+    const helpsOpp  = newSame >= 2; // 내 주사위가 상대 더블 이상을 만들어줌
 
-    const myRowScore  = rowScore(state.playerRows[r]);
-    const oppWinning  = oldOppScore > myRowScore;
+    const myRowScore = rowScore(state.playerRows[r]);
 
-    // 휴리스틱: 차단 가치 높고 상대 도움 안 줄수록 좋음
-    let heuristic = blockingValue * 1.5 - scoreIncrease * 2;
-    if (helpsOpp)    heuristic -= 30; // 상대 더블/트리플 완성 → 매우 불리
-    if (oppWinning && blockingValue > 0) heuristic += 10; // 이기는 줄 차단
-    if (blockingValue <= 0 && !helpsOpp) heuristic -= 5;  // 차단 효과 없음
+    // 핵심 휴리스틱: 차단 가치 기반
+    // blockingValue가 크면 상대 고점을 크게 낮춤 → 상대 필드가 유리
+    let heuristic = blockingValue * 2.5;
+    if (helpsOpp)         heuristic -= 35; // 상대 콤보 완성 → 매우 불리
+    if (blockingValue > 8)  heuristic += 12; // 고가치 차단 (트리플 방지 등)
+    if (blockingValue > 0 && !helpsOpp) heuristic += 6;
+    if (blockingValue <= 0 && !helpsOpp) heuristic -= 10; // 차단 효과 없음
 
-    const isBad = helpsOpp || (scoreIncrease > 5 && blockingValue <= 0);
+    const isBad = helpsOpp;
 
-    options.push({ side: 'opp', row: r, scoreIncrease, blockingValue, heuristic, sameAsOpp, helpsOpp, isBad, newOppScore, myRowScore });
+    options.push({ side: 'opp', row: r, blockingValue, oppBestPossible, newOppScore, heuristic, newSame, helpsOpp, isBad, myRowScore });
   }
 
   options.sort((a, b) => b.heuristic - a.heuristic);
@@ -886,15 +895,12 @@ function doRecommendBonus(dieValue) {
         `${opt.diff > 0 ? '✓ 우세' : opt.diff < 0 ? '✗ 열세' : '= 동점'}${sameNote}`;
     } else {
       const helpNote = opt.helpsOpp
-        ? `<span style="color:var(--opp)">⚠ 상대 ${opt.sameAsOpp >= 3 ? '트리플' : '더블'} 완성 — 비추천</span>`
+        ? `<span style="color:var(--opp)">⚠ 상대 ${opt.newSame >= 3 ? '트리플' : '더블'} 완성 — 비추천</span>`
         : '';
       const blockNote = opt.blockingValue > 0
-        ? `상대 최대점 <strong>-${opt.blockingValue}점</strong> 방지`
-        : '차단 효과 미미';
-      detail.innerHTML =
-        `${blockNote}<br>` +
-        `상대 점수 +${opt.scoreIncrease} (슬롯 차단)<br>` +
-        helpNote;
+        ? `상대 최고점 <strong>${opt.oppBestPossible}</strong> → <strong>${opt.newOppScore}</strong>로 차단 (<strong>-${opt.blockingValue}점</strong> 방지)`
+        : `차단 효과 없음 (상대 점수 +${opt.newOppScore - (opt.newOppScore - opt.blockingValue)})`;
+      detail.innerHTML = `${blockNote}<br>${helpNote}`;
     }
     div.appendChild(detail);
 
