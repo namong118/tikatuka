@@ -65,19 +65,6 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
   gap: 14px;
   flex-wrap: wrap;
 }
-.turn-label { font-size: .68rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); flex-shrink: 0; }
-
-.first-turn-btns { display: flex; gap: 6px; }
-.first-turn-btn {
-  padding: 7px 14px; border-radius: 7px; font-family: inherit; font-size: .82rem; font-weight: 700;
-  cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--text-dim);
-  transition: all .15s;
-}
-.first-turn-btn:hover { border-color: var(--gold); color: var(--gold); }
-.first-turn-btn.sel-player { border-color: var(--player); background: var(--player-dim); color: var(--player); }
-.first-turn-btn.sel-opp    { border-color: var(--opp);    background: var(--opp-dim);    color: var(--opp); }
-
-.turn-divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
 
 .current-turn-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
 .turn-dot {
@@ -148,15 +135,16 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .die-btn.active-opp { border-color: var(--opp);  box-shadow: 0 0 10px rgba(224,72,72,.35); }
 
 /* ─── SIDE PANEL TOGGLES & BUTTONS ─── */
-.shield-toggle, .tajja-toggle {
+.shield-toggle, .tajja-toggle, .bonus-die-toggle {
   display: flex; align-items: center; justify-content: center; gap: 7px;
   background: var(--bg2); border: 1px solid var(--border);
   border-radius: 7px; padding: 7px 8px;
   cursor: pointer; font-size: .8rem; color: var(--text-dim);
   transition: border-color .15s, color .15s; user-select: none;
 }
-.shield-toggle.active { border-color: var(--shield); color: var(--shield); }
-.tajja-toggle.active  { border-color: var(--bonus);  color: var(--bonus); }
+.shield-toggle.active    { border-color: var(--shield); color: var(--shield); }
+.tajja-toggle.active     { border-color: var(--bonus);  color: var(--bonus); }
+.bonus-die-toggle.active { border-color: var(--gold);   color: var(--gold); }
 
 .tajja-analysis {
   width: 100%; background: rgba(192,122,255,.07); border: 1px solid rgba(192,122,255,.3);
@@ -201,6 +189,12 @@ header p  { font-size: .73rem; color: var(--text-dim); margin-top: 4px; letter-s
 .rec-main   { font-size: 1rem; font-weight: 700; min-height: 22px; }
 .rec-main .row-hl     { color: var(--win);     font-size: 1.2rem; }
 .rec-main .alk-hl     { color: var(--alkkagi); }
+.rec-main .prob-tag   { background: #1a3a2a; color: var(--win); font-size: .85rem; padding: 1px 6px; border-radius: 4px; font-weight: 700; vertical-align: middle; }
+.rec-main .baseline-note { font-size: .72rem; color: var(--text-dim); font-weight: 400; }
+.prob-gain            { font-size: .8rem; color: var(--text-dim); }
+.opt-detail .prob-gain { color: #7ab89a; }
+.prob-raw             { font-size: .75rem; color: var(--text-dim); margin-left: 4px; }
+.risk-note            { display: block; font-size: .77rem; color: #e8a040; margin-top: 3px; }
 
 .rec-options { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
@@ -373,21 +367,13 @@ body.bonus-mode .die-slot.empty {
 
   <!-- TURN PANEL -->
   <div class="turn-panel">
-    <span class="turn-label">선공</span>
-    <div class="first-turn-btns">
-      <button class="first-turn-btn" id="ftPlayer" onclick="setFirstTurn('player')">내가 선공</button>
-      <button class="first-turn-btn" id="ftOpp"    onclick="setFirstTurn('opp')">상대 선공</button>
-    </div>
-
-    <div class="turn-divider"></div>
-
     <div class="current-turn-wrap">
-      <div class="turn-dot" id="turnDot"></div>
-      <span class="turn-text" id="turnText">—</span>
-      <span class="turn-count" id="turnCount"></span>
+      <div class="turn-dot player" id="turnDot"></div>
+      <span class="turn-text player" id="turnText">내 턴</span>
+      <span class="turn-count" id="turnCount">(1번째 턴)</span>
     </div>
 
-    <button class="btn-next-turn" id="btnNextTurn" onclick="nextTurn()" disabled>다음 턴 →</button>
+    <button class="btn-next-turn" id="btnNextTurn" onclick="nextTurn()">다음 턴 →</button>
   </div>
 
   <!-- MAIN GRID -->
@@ -401,6 +387,10 @@ body.bonus-mode .die-slot.empty {
       <div class="shield-toggle" id="shieldToggle" onclick="toggleShield()">
         <span>🛡</span>
         <span id="shieldLabel">일반</span>
+      </div>
+      <div class="bonus-die-toggle" id="bonusDieToggle" onclick="toggleBonusDie()">
+        <span>🎲</span>
+        <span id="bonusDieLabel">일반</span>
       </div>
       <div class="tajja-toggle active" id="tajjaToggle" onclick="toggleTajja()">
         <span>🃏</span>
@@ -463,9 +453,10 @@ body.bonus-mode .die-slot.empty {
 
   <div class="how-to">
     <strong>사용법</strong><br>
-    ① 선공 선택 → 주사위 값 선택 → <strong>추천 받기</strong> 또는 슬롯 직접 클릭<br>
+    ① 주사위 값 선택 → <strong>추천 받기</strong> 또는 슬롯 직접 클릭<br>
     ② 슬롯 <strong>우클릭</strong>으로 주사위 제거 &nbsp;|&nbsp; 🛡 실드 선택 후 배치<br>
-    ③ 알까기 발동 시 → 추천 결과에서 <strong>알까기 발동</strong> 버튼 클릭 → 보너스 주사위 배치<br>
+    ③ 🎲 <strong>보너스 주사위</strong> 활성화 시 — 내/상대 필드 어디든 실드 주사위로 배치 가능<br>
+    ④ 알까기 발동 시 → 추천 결과에서 <strong>알까기 발동</strong> 버튼 클릭 → 보너스 주사위 배치<br>
     <br>
     <strong>보너스 계산</strong> &nbsp;더블: 같은 눈 2개 → ×3 &nbsp;|&nbsp; 트리플: 같은 눈 3개 → ×5<br>
     <strong>알까기</strong> &nbsp;내 N번 줄에 배치 시 상대 N번 줄에 같은 눈이 있으면 발동 (내 N번 줄 꽉 차면 불가) — 해당 줄 상대 주사위(실드 제외) 전부 제거 + 보너스 실드 주사위 (양 필드 배치 가능)
@@ -509,7 +500,6 @@ const state = {
   recommendedRow: null,
   alkkagiBonus:  false,
   alkkagiSide:   null,           // 'player' | 'opp' — 누가 알까기를 발동했는지
-  firstTurn:     null,           // 'player' | 'opp'
   currentTurn:   'player',
   turnCount:     1,
   hasTajja:      true,           // 타짜의 손놀림 스킬 보유 여부 (게임당 1회)
@@ -537,21 +527,123 @@ function maxRowScore(dice) {
 }
 
 // ─── RECOMMENDATION ENGINE ────────────────────────────────────────────────
-// 알까기는 줄별(row-specific): 내 N번 줄에 배치해야 상대 N번 줄 알까기 발동
-// 조건: 내 N번 줄에 빈 슬롯 있어야 배치 가능 → 내 N번 줄 꽉 차면 해당 줄 알까기 불가
+
+// 비실드 더블/트리플 생성 시 상대 알까기 취약성 페널티
+// — 상대 같은 줄에 빈칸이 있을 때, P(상대가 그 값을 굴림)=1/6 × 내 승률 하락분
+function calcDoubleVulnerability(newDice, rowIdx, winProb) {
+  const oppRow = state.opponentRows[rowIdx];
+  if (oppRow.length >= 3) return { penalty: 0, notes: [] };
+
+  let penalty = 0;
+  const notes = [];
+  const checked = new Set();
+
+  for (const d of newDice) {
+    if (d.shield || checked.has(d.value)) continue;
+    const v = d.value;
+    checked.add(v);
+    const nonShieldCount = newDice.filter(x => x.value === v && !x.shield).length;
+    if (nonShieldCount < 2) continue;
+
+    // 상대가 v를 굴려 내 비실드 v 전부 제거
+    const myRowAfterAlk = newDice.filter(x => !(x.value === v && !x.shield));
+    const simP = state.playerRows.map((row, i) => i === rowIdx ? myRowAfterAlk : row);
+    const wpAfterAlk = gameWinProb(simP, state.opponentRows);
+    const p = (1 / 6) * (wpAfterAlk - winProb); // 음수
+    if (p < 0) {
+      penalty += p;
+      const combo = nonShieldCount >= 3 ? '트리플' : '더블';
+      notes.push(`⚠ 비실드 ${v}눈 ${combo} — 상대 알까기 시 ${(p * 100).toFixed(1)}%p`);
+    }
+  }
+  return { penalty, notes };
+}
+
+// 줄을 채울 때 잃게 되는 미래 알까기 기회 페널티
+// — 상대 같은 줄 비실드 각 값에 대해, P(그 값 굴림)=1/6 × 알까기 기대 게임 승률 이득
+function calcLostAlkOpportunity(rowIdx, simP, winProb) {
+  if (simP[rowIdx].length < 3) return { penalty: 0, notes: [] }; // 줄 안 채워짐
+
+  const oppRow = state.opponentRows[rowIdx];
+  const oppUniqueVals = [...new Set(oppRow.filter(d => !d.shield).map(d => d.value))];
+
+  let penalty = 0;
+  const notes = [];
+
+  for (const oppVal of oppUniqueVals) {
+    // 현재 board(pre-fill) 기준으로 알까기 시뮬: state.playerRows[rowIdx]에 빈칸 있음
+    const postOppRow  = oppRow.filter(d => !(d.value === oppVal && !d.shield));
+    const postOppRows = state.opponentRows.map((row, i) => i === rowIdx ? postOppRow : row);
+
+    let totalBonusWP = 0;
+    for (let bv = 1; bv <= 6; bv++) {
+      let bestWP = gameWinProb(state.playerRows, postOppRows);
+      // 보너스 주사위 — 내 필드 (rowIdx 포함, pre-fill 슬롯 있음)
+      for (let br = 0; br < 3; br++) {
+        if (state.playerRows[br].length >= 3) continue;
+        const sp2 = state.playerRows.map((row, i) => i === br ? [...row, {value: bv, shield: true}] : row);
+        bestWP = Math.max(bestWP, gameWinProb(sp2, postOppRows));
+      }
+      // 보너스 주사위 — 상대 필드
+      for (let br = 0; br < 3; br++) {
+        if (postOppRows[br].length >= 3) continue;
+        const so = postOppRows.map((row, i) => i === br ? [...row, {value: bv, shield: true}] : row);
+        bestWP = Math.max(bestWP, gameWinProb(state.playerRows, so));
+      }
+      totalBonusWP += bestWP;
+    }
+    const alkWP = totalBonusWP / 6;
+    const gain = alkWP - winProb;
+    if (gain > 0) {
+      const p = -(1 / 6) * gain;
+      penalty += p;
+      notes.push(`⚠ 줄 완성 → 상대 ${oppVal}눈 알까기 기회 소멸 ${(p * 100).toFixed(1)}%p`);
+    }
+  }
+  return { penalty, notes };
+}
+
+// 상대 줄을 완성(3/3)시킬 때, 내 비실드 주사위가 그 줄에서 더 이상 알까기 안 당하는 보호 가치
+// baseline(현재 상태)에서 상대가 v를 굴려 알까기했을 경우의 손실을 기준으로 산정
+// Tip 3: 보너스 주사위로 상대 2칸 줄 채워서 알까기 기회 영구 봉쇄
+function calcAlkProtectionBonus(rowIdx, newOppRow, baseline) {
+  if (newOppRow.length < 3) return { bonus: 0, notes: [] };
+
+  const myRow = state.playerRows[rowIdx];
+  const myNonShieldVals = [...new Set(myRow.filter(d => !d.shield).map(d => d.value))];
+
+  let bonus = 0;
+  const notes = [];
+
+  for (const v of myNonShieldVals) {
+    const myRowAfterAlk = myRow.filter(x => !(x.value === v && !x.shield));
+    if (myRowAfterAlk.length === myRow.length) continue; // 제거될 비실드 없음
+
+    // 원래 필드 상태에서 상대가 v를 굴려 알까기했다면 승률이 얼마나 떨어졌을지
+    const simP = state.playerRows.map((row, i) => i === rowIdx ? myRowAfterAlk : row);
+    const wpIfAlk = gameWinProb(simP, state.opponentRows); // 봉쇄 전 원본 기준
+    const damage = wpIfAlk - baseline; // 음수 (알까기 당했을 때 손실)
+
+    if (damage < -0.001) {
+      const protectionValue = -(1 / 6) * damage; // 양수 (봉쇄로 방지한 기대 손실)
+      bonus += protectionValue;
+      notes.push(`🔒 내 ${v}눈 알까기 원천 봉쇄 (+${(protectionValue * 100).toFixed(1)}%p)`);
+    }
+  }
+  return { bonus, notes };
+}
+
 function getRecommendations(dieValue) {
-  const options = [];
+  const options  = [];
+  const baseline = gameWinProb(state.playerRows, state.opponentRows);
 
   for (let r = 0; r < 3; r++) {
     const pRow = state.playerRows[r];
-
-    // 내 줄이 꽉 차면 알까기/배치 모두 불가
     if (pRow.length >= 3) {
-      options.push({ row: r, type: 'full', heuristic: -999 });
+      options.push({ row: r, type: 'full', winProb: -1, heuristic: -999 });
       continue;
     }
 
-    // 상대 같은 줄에 해당 값이 있으면 알까기 발동 가능
     const oppMatchingDice = state.opponentRows[r].filter(d => d.value === dieValue && !d.shield);
 
     if (oppMatchingDice.length > 0) {
@@ -561,72 +653,62 @@ function getRecommendations(dieValue) {
       const newOppScore  = rowScore(newOppRow);
       const oppLoss      = oldOppScore - newOppScore;
       const removedCount = oppMatchingDice.length;
+      const postOppRows  = state.opponentRows.map((row, i) => i === r ? newOppRow : row);
 
-      // 알까기 후 상태에서 보너스 주사위 기대 가치 계산 (실제 보드 반영)
-      const postOppRows    = state.opponentRows.map((row, i) => i === r ? newOppRow : row);
-      const expectedBonus  = calcExpectedBonusValue(postOppRows);
-
-      let winsAfter = 0;
-      for (let i = 0; i < 3; i++) {
-        if (rowScore(state.playerRows[i]) > rowScore(postOppRows[i])) winsAfter++;
+      let totalWinProb = 0;
+      for (let bv = 1; bv <= 6; bv++) {
+        let bestWP = gameWinProb(state.playerRows, postOppRows);
+        for (let br = 0; br < 3; br++) {
+          if (state.playerRows[br].length >= 3) continue;
+          const simP = state.playerRows.map((row, i) => i === br ? [...row, {value: bv, shield: true}] : row);
+          bestWP = Math.max(bestWP, gameWinProb(simP, postOppRows));
+        }
+        for (let br = 0; br < 3; br++) {
+          if (postOppRows[br].length >= 3) continue;
+          const simO = postOppRows.map((row, i) => i === br ? [...row, {value: bv, shield: true}] : row);
+          bestWP = Math.max(bestWP, gameWinProb(state.playerRows, simO));
+        }
+        totalWinProb += bestWP;
       }
+      const alkWinProb = totalWinProb / 6;
 
-      const totalBenefit = oppLoss + expectedBonus;
-      let heuristic = oppLoss * 3 + expectedBonus * 1.5 + winsAfter * 10;
-      if (removedCount >= 2) heuristic += 25;          // 더블/트리플 파괴
-      if (rowScore(state.playerRows[r]) > newOppScore) heuristic += 15; // 이미 해당 줄 우세
-
-      options.push({ row: r, type: 'alkkagi', oppLoss, removedCount, newOppScore, totalBenefit, winsAfter, heuristic });
+      options.push({ row: r, type: 'alkkagi', oppLoss, removedCount, newOppScore,
+        winProb: alkWinProb, winGain: alkWinProb - baseline, heuristic: alkWinProb,
+        riskNotes: [] });
 
     } else {
       // ── 직접 배치 옵션 ──
       const newDice   = [...pRow, { value: dieValue, shield: false }];
       const newScore  = rowScore(newDice);
-      const gain      = newScore - rowScore(pRow);
       const oScore    = rowScore(state.opponentRows[r]);
       const diff      = newScore - oScore;
       const sameCount = newDice.filter(d => d.value === dieValue).length;
 
-      let wins = 0;
-      for (let i = 0; i < 3; i++) {
-        const ps = i === r ? newScore : rowScore(state.playerRows[i]);
-        if (ps > rowScore(state.opponentRows[i])) wins++;
-      }
+      const simP       = state.playerRows.map((row, i) => i === r ? newDice : row);
+      const rawWinProb = gameWinProb(simP, state.opponentRows);
 
-      // 상대가 이 줄에서 낼 수 있는 실제 최고점
-      const oppBestPossible = calcOppBestPossible(state.opponentRows[r]);
-      const competitiveGap  = oppBestPossible - newScore; // 낮을수록 유리
-      const oppSlotsLeft    = 3 - state.opponentRows[r].length;
+      // 전략적 리스크 페널티 계산
+      const { penalty: dblP, notes: dblNotes } = calcDoubleVulnerability(newDice, r, rawWinProb);
+      const { penalty: alkP, notes: alkNotes }  = calcLostAlkOpportunity(r, simP, rawWinProb);
+      const winProb   = Math.max(0, Math.min(1, rawWinProb + dblP + alkP));
+      const riskNotes = [...dblNotes, ...alkNotes];
 
-      let heuristic = gain * 2;
-      if (sameCount === 3) heuristic += 35;
-      else if (sameCount === 2) heuristic += 15;
-      if (diff > 0) heuristic += 18;
-      else if (diff === 0) heuristic += 4;
-      heuristic += wins * 7;
-      if (state.opponentRows[r].length === 3 && oScore >= maxRowScore(newDice)) heuristic -= 20;
-
-      // 상대 최고점 대비 경쟁력: 차이가 작을수록(이기거나 박빙) 가중치 추가
-      if (newScore >= oppBestPossible)   heuristic += 30; // 내가 이미 이길 수 있음
-      else if (competitiveGap <= 4)      heuristic += 18; // 박빙 — 조금만 더하면 이김
-      else if (competitiveGap <= 8)      heuristic += 10;
-      // 상대 슬롯이 적을수록 (줄이 굳어질수록) 전략적 가치 높음
-      if (oppSlotsLeft === 1)            heuristic += 12; // 상대 마지막 슬롯 → 천장 확정
-      else if (oppSlotsLeft === 0)       heuristic += 0;  // 이미 확정 (위에서 처리)
-
+      // 줄 승리 확률 기반 라벨 (현재 점수차 대신 실제 확률 사용)
+      const rowWP = rowWinProb(newDice, state.opponentRows[r]);
       let bonus = '';
-      if (sameCount === 3)           bonus = '🔥 트리플 완성!';
-      else if (sameCount === 2)      bonus = '✨ 더블 완성';
-      else if (diff > 0)             bonus = '우세 확보';
-      else if (diff === 0 && oScore) bonus = '동점';
-      else if (gain > 0)             bonus = `+${gain}점`;
+      if (sameCount === 3)      bonus = '🔥 트리플 완성!';
+      else if (sameCount === 2) bonus = '✨ 더블 완성';
+      else if (rowWP > 0.62)   bonus = '✓ 이 줄 우세';
+      else if (rowWP < 0.38)   bonus = '✗ 이 줄 열세';
+      else                     bonus = '△ 이 줄 팽팽';
 
-      options.push({ row: r, type: 'normal', gain, newScore, oScore, diff, wins, heuristic, bonus, sameCount });
+      options.push({ row: r, type: 'normal', newScore, oScore, diff, sameCount, bonus, rowWP,
+        winProb, rawWinProb, winGain: winProb - baseline, riskNotes, heuristic: winProb });
     }
   }
 
   options.sort((a, b) => b.heuristic - a.heuristic);
-  return options;
+  return { options, baseline };
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────
@@ -847,8 +929,24 @@ function renderScoreboard() {
   } else if (ow >= 2) {
     ind.className = 'win-indicator show wi-o';
     ind.textContent = '⚠️ 상대가 앞서고 있습니다. 역전 노려야 합니다!';
+  } else if (pw === 1 && ow === 1) {
+    // 1승 1무 1패 — Rule 1: 총합 비교
+    let totalP = 0, totalO = 0;
+    for (let r = 0; r < 3; r++) { totalP += rowScore(state.playerRows[r]); totalO += rowScore(state.opponentRows[r]); }
+    if (totalP > totalO) {
+      ind.className = 'win-indicator show wi-p';
+      ind.textContent = `1승 1무 1패 — 총합 ${totalP} vs ${totalO}: 내가 우세합니다!`;
+    } else if (totalO > totalP) {
+      ind.className = 'win-indicator show wi-o';
+      ind.textContent = `1승 1무 1패 — 총합 ${totalP} vs ${totalO}: 상대가 우세합니다!`;
+    } else {
+      ind.className = 'win-indicator show';
+      ind.style.background = 'rgba(150,150,150,.1)'; ind.style.border = '1px solid #777'; ind.style.color = '#aaa';
+      ind.textContent = `1승 1무 1패 — 총합 ${totalP} vs ${totalO}: 동점`;
+    }
   } else {
     ind.className = 'win-indicator';
+    ind.style = '';
   }
 }
 
@@ -857,18 +955,6 @@ function renderTurn() {
   const text  = document.getElementById('turnText');
   const count = document.getElementById('turnCount');
   const btn   = document.getElementById('btnNextTurn');
-
-  if (!state.firstTurn) {
-    dot.className = 'turn-dot';
-    dot.style.background = '#4a7090';
-    text.className = 'turn-text';
-    text.textContent = '선공을 선택하세요';
-    count.textContent = '';
-    btn.disabled = true;
-    document.getElementById('bhPlayer').classList.remove('active-turn');
-    document.getElementById('bhOpp').classList.remove('active-turn');
-    return;
-  }
 
   const isPlayer = state.currentTurn === 'player';
   dot.className = 'turn-dot ' + (isPlayer ? 'player' : 'opp');
@@ -879,17 +965,6 @@ function renderTurn() {
 
   document.getElementById('bhPlayer').classList.toggle('active-turn', isPlayer);
   document.getElementById('bhOpp').classList.toggle('active-turn', !isPlayer);
-}
-
-// ─── TURN MANAGEMENT ──────────────────────────────────────────────────────
-function setFirstTurn(who) {
-  state.firstTurn   = who;
-  state.currentTurn = who;
-  state.turnCount   = 1;
-
-  document.getElementById('ftPlayer').className = 'first-turn-btn' + (who === 'player' ? ' sel-player' : '');
-  document.getElementById('ftOpp').className    = 'first-turn-btn' + (who === 'opp'    ? ' sel-opp'    : '');
-  render();
 }
 
 function nextTurn() {
@@ -943,6 +1018,7 @@ function selectOppDie(v) {
     b.classList.toggle('active-opp', on);
     drawDie(b.querySelector('canvas'), +b.dataset.val, on ? '#ff6868' : '#a05858', 40);
   });
+  if (state.alkkagiBonus && state.alkkagiSide === 'opp') doRecommendBonus(v);
 }
 
 // ─── 보너스 실드 주사위 배치 추천 ────────────────────────────────────────────
@@ -958,6 +1034,110 @@ function calcOppBestPossible(oRow) {
     if (s > best) best = s;
   }
   return best;
+}
+
+// ─── 확률 기반 평가 ─────────────────────────────────────────────────────────
+// 줄 결과 확률(승/무/패): 양쪽 남은 슬롯 모두 1/6 랜덤, Int32Array incremental + 메모이제이션
+const _rwpCache = new Map();
+
+function rowOutcomeProbs(pRow, oRow) {
+  const pk = pRow.map(d => d.value).sort().join(',');
+  const ok = oRow.map(d => d.value).sort().join(',');
+  const key = pk + '|' + ok;
+  if (_rwpCache.has(key)) return _rwpCache.get(key);
+
+  const pSlots = 3 - pRow.length;
+  const oSlots = 3 - oRow.length;
+
+  if (pSlots === 0 && oSlots === 0) {
+    const ps = rowScore(pRow), os = rowScore(oRow);
+    const r = ps > os ? {win:1,tie:0,loss:0} : ps < os ? {win:0,tie:0,loss:1} : {win:0,tie:1,loss:0};
+    _rwpCache.set(key, r); return r;
+  }
+
+  const pCount = new Int32Array(7); pRow.forEach(d => pCount[d.value]++);
+  const oCount = new Int32Array(7); oRow.forEach(d => oCount[d.value]++);
+  function score(cnt) {
+    let s = 0;
+    for (let v = 1; v <= 6; v++) { const n = cnt[v]; if(n===1)s+=v; else if(n===2)s+=v*3; else if(n>=3)s+=v*5; }
+    return s;
+  }
+
+  let wins = 0, ties = 0, total = 0;
+  function go(step) {
+    if (step === pSlots + oSlots) {
+      const ps = score(pCount), os = score(oCount);
+      if (ps > os) wins++; else if (ps === os) ties++;
+      total++; return;
+    }
+    const cnt = step < pSlots ? pCount : oCount;
+    for (let v = 1; v <= 6; v++) { cnt[v]++; go(step+1); cnt[v]--; }
+  }
+  go(0);
+
+  const result = { win: wins/total, tie: ties/total, loss: (total-wins-ties)/total };
+  _rwpCache.set(key, result);
+  return result;
+}
+
+function rowWinProb(pRow, oRow) { return rowOutcomeProbs(pRow, oRow).win; }
+
+// 남은 슬롯 1/6 랜덤 기대 점수 (1승1무1패 총합 비교용)
+function expectedRowScore(row) {
+  if (row.length >= 3) return rowScore(row);
+  const cnt = new Int32Array(7); row.forEach(d => cnt[d.value]++);
+  function score(c) { let s=0; for(let v=1;v<=6;v++){const n=c[v];if(n===1)s+=v;else if(n===2)s+=v*3;else if(n>=3)s+=v*5;} return s; }
+  const slotsLeft = 3 - row.length;
+  let total = 0, count = 0;
+  function go(step) {
+    if (step === slotsLeft) { total += score(cnt); count++; return; }
+    for (let v = 1; v <= 6; v++) { cnt[v]++; go(step+1); cnt[v]--; }
+  }
+  go(0);
+  return total / count;
+}
+
+// 해석적 게임 승률: Rule 1(1승1무1패 총합) 반영
+function gameWinProb(playerRows, oppRows) {
+  const outcomes = [0,1,2].map(i => rowOutcomeProbs(playerRows[i], oppRows[i]));
+  const [r0, r1, r2] = outcomes;
+
+  // P(2줄 이상 우세) — 정확
+  const pWin2 = r0.win*r1.win + r0.win*r2.win + r1.win*r2.win - 2*r0.win*r1.win*r2.win;
+
+  // P(1승 1무 1패) — Rule 1 타이브레이커, 정확
+  const pWTL = r0.win*r1.tie*r2.loss + r0.win*r1.loss*r2.tie
+             + r0.tie*r1.win*r2.loss + r0.tie*r1.loss*r2.win
+             + r0.loss*r1.win*r2.tie + r0.loss*r1.tie*r2.win;
+
+  if (pWTL < 0.0005) return pWin2;
+
+  // 총합 비교 승률 추정: 기대 점수 비율로 근사
+  const expP = [0,1,2].reduce((s,r) => s + expectedRowScore(playerRows[r]), 0);
+  const expO = [0,1,2].reduce((s,r) => s + expectedRowScore(oppRows[r]), 0);
+  const tieWinP = (expP + expO) > 0 ? Math.max(0.1, Math.min(0.9, expP / (expP + expO))) : 0.5;
+
+  return pWin2 + pWTL * tieWinP;
+}
+
+// 몬테카를로: 전체 룰(1승1무1패 총합 포함) 정확 시뮬레이션 — 최종 표시용
+function gameWinProbMC(playerRows, oppRows, N) {
+  N = N || 6000;
+  let wins = 0;
+  for (let i = 0; i < N; i++) {
+    let tp = 0, to = 0, pW = 0, oW = 0;
+    for (let r = 0; r < 3; r++) {
+      const pFull = [...playerRows[r]];
+      while (pFull.length < 3) pFull.push({value: (Math.random() * 6 | 0) + 1});
+      const oFull = [...oppRows[r]];
+      while (oFull.length < 3) oFull.push({value: (Math.random() * 6 | 0) + 1});
+      const ps = rowScore(pFull), os = rowScore(oFull);
+      tp += ps; to += os;
+      if (ps > os) pW++; else if (os > ps) oW++;
+    }
+    if (pW >= 2 || (pW === 1 && oW === 1 && tp > to)) wins++;
+  }
+  return wins / N;
 }
 
 // 알까기 후 상태에서 보너스 실드 주사위의 기대 전략 가치 계산
@@ -1003,7 +1183,8 @@ function calcExpectedBonusValue(postOppRows) {
 }
 
 function getBonusDieRecommendations(dieValue) {
-  const options = [];
+  const options  = [];
+  const baseline = gameWinProb(state.playerRows, state.opponentRows);
 
   // ── 내 필드 배치 옵션 ──
   for (let r = 0; r < 3; r++) {
@@ -1017,69 +1198,57 @@ function getBonusDieRecommendations(dieValue) {
     const diff      = newScore - oScore;
     const sameCount = newDice.filter(d => d.value === dieValue).length;
 
-    let wins = 0;
-    for (let i = 0; i < 3; i++) {
-      const ps = i === r ? newScore : rowScore(state.playerRows[i]);
-      if (ps > rowScore(state.opponentRows[i])) wins++;
-    }
+    const simP    = state.playerRows.map((row, i) => i === r ? newDice : row);
+    const winProb = gameWinProb(simP, state.opponentRows);
 
-    let heuristic = gain * 2.5;
-    if (sameCount === 3) heuristic += 35;
-    else if (sameCount === 2) heuristic += 15;
-    if (diff > 0) heuristic += 20;
-    else if (diff === 0) heuristic += 5;
-    heuristic += wins * 8;
-    if (state.opponentRows[r].length === 3 && oScore >= maxRowScore(newDice)) heuristic -= 18;
-
+    // 줄 승리 확률 기반 라벨
+    const rowWP = rowWinProb(newDice, state.opponentRows[r]);
     let bonusLabel = '';
-    if (sameCount === 3)           bonusLabel = '🔥 트리플 완성!';
-    else if (sameCount === 2)      bonusLabel = '✨ 더블 완성';
-    else if (diff > 0)             bonusLabel = '우세 확보';
-    else if (diff === 0 && oScore) bonusLabel = '동점 유지';
+    if (sameCount === 3)      bonusLabel = '🔥 트리플 완성!';
+    else if (sameCount === 2) bonusLabel = '✨ 더블 완성';
+    else if (rowWP > 0.62)   bonusLabel = '✓ 이 줄 우세';
+    else if (rowWP < 0.38)   bonusLabel = '✗ 이 줄 열세';
+    else                     bonusLabel = '△ 이 줄 팽팽';
 
-    options.push({ side: 'player', row: r, gain, newScore, oScore, diff, wins, heuristic, bonusLabel, sameCount });
+    options.push({ side: 'player', row: r, gain, newScore, oScore, diff, sameCount, bonusLabel, rowWP,
+      winProb, winGain: winProb - baseline, heuristic: winProb });
   }
 
-  // ── 상대 필드 배치 옵션 (방해/차단) ──
+  // ── 상대 필드 배치 옵션 (차단) ──
   for (let r = 0; r < 3; r++) {
     const oRow = state.opponentRows[r];
     if (oRow.length >= 3) continue;
 
-    // 상대가 이 줄에서 낼 수 있는 실제 최고점 (1~6 시뮬레이션)
     const oppBestPossible = calcOppBestPossible(oRow);
     const newOppDice  = [...oRow, { value: dieValue, shield: true }];
     const newOppScore = rowScore(newOppDice);
-
-    // 차단 가치 = 내가 막지 않았으면 상대가 낼 수 있는 최고점 - 내가 막은 후 점수
-    // 양수일수록 좋음: 상대 고점을 많이 낮춤
     const blockingValue = oppBestPossible - newOppScore;
 
-    // 내가 상대의 더블/트리플을 완성시켜주는지 확인
-    const prevSame  = oRow.filter(d => d.value === dieValue).length;
-    const newSame   = prevSame + 1;
-    const helpsOpp  = newSame >= 2; // 내 주사위가 상대 더블 이상을 만들어줌
+    const prevSame = oRow.filter(d => d.value === dieValue).length;
+    const newSame  = prevSame + 1;
+    const helpsOpp = newSame >= 2;
+    const isBad    = helpsOpp;
 
-    const myRowScore = rowScore(state.playerRows[r]);
+    const simO    = state.opponentRows.map((row, i) => i === r ? newOppDice : row);
+    let winProb = gameWinProb(state.playerRows, simO);
 
-    // 핵심 휴리스틱: 차단 가치 기반
-    // blockingValue가 크면 상대 고점을 크게 낮춤 → 상대 필드가 유리
-    let heuristic = blockingValue * 2.5;
-    if (helpsOpp)         heuristic -= 35; // 상대 콤보 완성 → 매우 불리
-    if (blockingValue > 8)  heuristic += 12; // 고가치 차단 (트리플 방지 등)
-    if (blockingValue > 0 && !helpsOpp) heuristic += 6;
-    if (blockingValue <= 0 && !helpsOpp) heuristic -= 10; // 차단 효과 없음
+    // Tip 3: 줄 완성(3칸)으로 내 비실드 알까기 영구 봉쇄 가치 반영 (baseline 기준)
+    const { bonus: alkBonus, notes: alkNotes } = calcAlkProtectionBonus(r, newOppDice, baseline);
+    const isFillRow = newOppDice.length === 3;
+    if (isFillRow) winProb = Math.min(1, winProb + alkBonus);
 
-    const isBad = helpsOpp;
-
-    options.push({ side: 'opp', row: r, blockingValue, oppBestPossible, newOppScore, heuristic, newSame, helpsOpp, isBad, myRowScore });
+    options.push({ side: 'opp', row: r, blockingValue, oppBestPossible, newOppScore, newSame, helpsOpp, isBad,
+      isFillRow, alkProtectionNotes: alkNotes,
+      myRowScore: rowScore(state.playerRows[r]),
+      winProb, winGain: winProb - baseline, heuristic: winProb });
   }
 
   options.sort((a, b) => b.heuristic - a.heuristic);
-  return options;
+  return { options, baseline };
 }
 
 function doRecommendBonus(dieValue) {
-  const options = getBonusDieRecommendations(dieValue);
+  const { options, baseline } = getBonusDieRecommendations(dieValue);
   const panel   = document.getElementById('recPanel');
   const main    = document.getElementById('recMain');
   const optsCon = document.getElementById('recOptions');
@@ -1095,29 +1264,26 @@ function doRecommendBonus(dieValue) {
   const ROWS = ['1번 줄', '2번 줄', '3번 줄'];
   const best = options[0];
 
+  const pct = v => (v * 100).toFixed(1) + '%';
+  const gainStr = g => (g >= 0 ? '+' : '') + (g * 100).toFixed(1) + '%p';
+
   if (best.side === 'player') {
-    main.innerHTML = `🛡 보너스 추천: <span style="color:var(--player)">내 필드 ${ROWS[best.row]}</span>에 배치 &nbsp;${best.bonusLabel || ''}`;
+    main.innerHTML = `🛡 보너스 추천: <span style="color:var(--player)">내 필드 ${ROWS[best.row]}</span>에 배치 &nbsp;${best.bonusLabel || ''} <span class="prob-tag">${pct(best.winProb)}</span>`;
   } else if (best.isBad) {
     main.innerHTML = `🛡 보너스 추천: <span style="color:var(--player)">내 필드</span>에 배치 (상대 필드는 모두 불리)`;
   } else {
-    main.innerHTML = `🛡 보너스 추천: <span style="color:var(--alkkagi)">상대 필드 ${ROWS[best.row]} 차단</span> — 더 유리`;
+    main.innerHTML = `🛡 보너스 추천: <span style="color:var(--alkkagi)">상대 필드 ${ROWS[best.row]} 차단</span> <span class="prob-tag">${pct(best.winProb)}</span>`;
   }
 
   options.forEach((opt, i) => {
     const div = document.createElement('div');
     let cls = 'rec-opt';
     if (i === 0) cls += ' best-opt';
-
-    if (opt.side === 'player') {
-      cls += ' bonus-my-opt';
-    } else if (opt.isBad) {
-      cls += ' bonus-bad-opt';
-    } else {
-      cls += ' bonus-opp-opt';
-    }
+    if (opt.side === 'player') cls += ' bonus-my-opt';
+    else if (opt.isBad)        cls += ' bonus-bad-opt';
+    else                       cls += ' bonus-opp-opt';
     div.className = cls;
 
-    // 헤더행
     const nameEl = document.createElement('div');
     nameEl.className = 'opt-row-name';
     nameEl.innerHTML = `${ROWS[opt.row]} &nbsp;`;
@@ -1133,22 +1299,28 @@ function doRecommendBonus(dieValue) {
     nameEl.appendChild(tag);
     div.appendChild(nameEl);
 
-    // 상세
     const detail = document.createElement('div');
     detail.className = 'opt-detail';
     if (opt.side === 'player') {
       const sameNote = opt.sameCount === 3 ? ' 🔥 트리플!' : opt.sameCount === 2 ? ' ✨ 더블!' : '';
       detail.innerHTML =
-        `내 점수 → <strong>${opt.newScore}</strong> (+${opt.gain}) &nbsp;|&nbsp; 상대: ${opt.oScore}<br>` +
-        `${opt.diff > 0 ? '✓ 우세' : opt.diff < 0 ? '✗ 열세' : '= 동점'}${sameNote}`;
+        `내 점수 → <strong>${opt.newScore}</strong> (+${opt.gain}) &nbsp;|&nbsp; 상대: ${opt.oScore} <span style="color:var(--text-dim);font-size:.78rem">(줄 승률 ${opt.rowWP !== undefined ? (opt.rowWP*100).toFixed(0) : '?'}%)</span><br>` +
+        `${opt.bonusLabel || ''}${sameNote}<br>` +
+        `게임 승리 확률: <strong>${pct(opt.winProb)}</strong> <span class="prob-gain">(${gainStr(opt.winGain)})</span>`;
     } else {
       const helpNote = opt.helpsOpp
-        ? `<span style="color:var(--opp)">⚠ 상대 ${opt.newSame >= 3 ? '트리플' : '더블'} 완성 — 비추천</span>`
+        ? `<span style="color:var(--opp)">⚠ 상대 ${opt.newSame >= 3 ? '트리플' : '더블'} 완성 — 비추천</span><br>`
         : '';
       const blockNote = opt.blockingValue > 0
-        ? `상대 최고점 <strong>${opt.oppBestPossible}</strong> → <strong>${opt.newOppScore}</strong>로 차단 (<strong>-${opt.blockingValue}점</strong> 방지)`
-        : `차단 효과 없음 (상대 점수 +${opt.newOppScore - (opt.newOppScore - opt.blockingValue)})`;
-      detail.innerHTML = `${blockNote}<br>${helpNote}`;
+        ? `상대 최고점 <strong>${opt.oppBestPossible}</strong> → <strong>${opt.newOppScore}</strong> (<strong>-${opt.blockingValue}점</strong> 차단)`
+        : '차단 효과 없음';
+      const fillNote = opt.isFillRow ? `<br><span style="color:#6ec9a0;font-size:.82rem">🔒 줄 완성 — 상대 알까기 봉쇄</span>` : '';
+      const alkProtHTML = opt.alkProtectionNotes?.length
+        ? opt.alkProtectionNotes.map(n => `<span class="risk-note" style="color:#6ec9a0">${n}</span>`).join('')
+        : '';
+      detail.innerHTML =
+        `${helpNote}${blockNote}${fillNote}<br>` +
+        `게임 승리 확률: <strong>${pct(opt.winProb)}</strong> <span class="prob-gain">(${gainStr(opt.winGain)})</span>${alkProtHTML}`;
     }
     div.appendChild(detail);
 
@@ -1183,20 +1355,20 @@ function toggleTajja() {
 
 // 타짜의 손놀림: 현재 주사위 대비 다른 눈이 나왔을 때 기대 이득 계산
 function calcSkillAnalysis(currentDie) {
-  const currentOpts = getRecommendations(currentDie).filter(o => o.type !== 'full');
-  const currentBest = currentOpts.length ? currentOpts[0].heuristic : -999;
+  const { options: curOpts } = getRecommendations(currentDie);
+  const currentBest = curOpts.filter(o => o.type !== 'full').reduce((m, o) => Math.max(m, o.winProb), 0);
 
   const alternatives = [];
   for (let w = 1; w <= 6; w++) {
     if (w === currentDie) continue;
-    const opts = getRecommendations(w).filter(o => o.type !== 'full');
-    if (!opts.length) continue;
-    const bestH = opts[0].heuristic;
-    alternatives.push({ die: w, heuristic: bestH, gain: bestH - currentBest });
+    const { options: wOpts } = getRecommendations(w);
+    const valid = wOpts.filter(o => o.type !== 'full');
+    if (!valid.length) continue;
+    const bestWP = valid.reduce((m, o) => Math.max(m, o.winProb), 0);
+    alternatives.push({ die: w, winProb: bestWP, gain: bestWP - currentBest });
   }
   alternatives.sort((a, b) => b.gain - a.gain);
 
-  // 기대 이득 = 나올 수 있는 6가지 눈 중 더 나은 경우만 합산 / 6
   const expectedGain = alternatives.reduce((s, a) => s + Math.max(0, a.gain), 0) / 6;
   return { currentBest, alternatives, expectedGain };
 }
@@ -1260,13 +1432,36 @@ function exitBonusMode() {
   state.alkkagiSide  = null;
   document.body.classList.remove('bonus-mode');
   document.getElementById('bonusBanner').classList.remove('show');
+  const tog = document.getElementById('bonusDieToggle');
+  tog.classList.remove('active');
+  document.getElementById('bonusDieLabel').textContent = '일반';
+}
+
+function toggleBonusDie() {
+  if (state.alkkagiBonus) {
+    exitBonusMode();
+    return;
+  }
+  state.alkkagiBonus = true;
+  state.alkkagiSide  = 'player';
+  document.body.classList.add('bonus-mode');
+  document.getElementById('bonusBanner').classList.add('show');
+  document.getElementById('bonusBannerMsg').textContent = '🎲 보너스 주사위 — 내/상대 필드 어디든 실드 주사위로 배치 가능';
+  document.getElementById('bonusDieToggle').classList.add('active');
+  document.getElementById('bonusDieLabel').textContent = '보너스';
+  state.selectedDie = null;
+  renderTurn();
+  document.getElementById('diePicker').querySelectorAll('.die-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('recMain').textContent = '주사위 값을 선택하면 배치 추천을 보여줍니다.';
+  document.getElementById('recOptions').innerHTML = '';
 }
 
 // ─── RECOMMEND ────────────────────────────────────────────────────────────
 function doRecommend() {
   if (state.selectedDie === null) { alert('먼저 주사위 값(1~6)을 선택하세요!'); return; }
+  if (state.alkkagiBonus) { doRecommendBonus(state.selectedDie); return; }
 
-  const options = getRecommendations(state.selectedDie);
+  const { options, baseline } = getRecommendations(state.selectedDie);
   const valid   = options.filter(o => o.type !== 'full');
   const panel   = document.getElementById('recPanel');
   const main    = document.getElementById('recMain');
@@ -1279,6 +1474,9 @@ function doRecommend() {
     return;
   }
 
+  const pct     = v => (v * 100).toFixed(1) + '%';
+  const gainStr = g => (g >= 0 ? '+' : '') + (g * 100).toFixed(1) + '%p';
+
   const best       = valid[0];
   const hasAlkkagi = valid.some(o => o.type === 'alkkagi');
   state.recommendedRow = best.row;
@@ -1287,15 +1485,24 @@ function doRecommend() {
 
   const ROWS = ['1번 줄', '2번 줄', '3번 줄'];
 
+  // MC 검증: 최상위 추천 옵션에 대해 몬테카를로로 게임 승률 재검증
+  const bestSimP = best.type === 'alkkagi' ? state.playerRows
+    : state.playerRows.map((row, i) => i === best.row ? [...row, { value: state.selectedDie, shield: false }] : row);
+  const bestSimO = best.type === 'alkkagi'
+    ? state.opponentRows.map((row, i) => i === best.row ? row.filter(d => !(d.value === state.selectedDie && !d.shield)) : row)
+    : state.opponentRows;
+  const mcProb   = gameWinProbMC(bestSimP, bestSimO, 6000);
+  const mcNote   = `<span class="baseline-note" style="margin-left:6px">MC ${pct(mcProb)}</span>`;
+  const baselineNote = `<span class="baseline-note">현재 기준 ${pct(baseline)}</span>`;
+
   if (hasAlkkagi && best.type === 'alkkagi') {
-    main.innerHTML = `<span class="alk-hl">⚡ ${ROWS[best.row]} 알까기</span>가 최선입니다`;
+    main.innerHTML = `<span class="alk-hl">⚡ ${ROWS[best.row]} 알까기</span>가 최선 <span class="prob-tag">${pct(best.winProb)}</span> ${baselineNote}${mcNote}`;
   } else if (hasAlkkagi) {
-    main.innerHTML = `<span class="row-hl">${ROWS[best.row]}</span> 직접 배치가 최선 (알까기 가능하지만 불리)`;
+    main.innerHTML = `<span class="row-hl">${ROWS[best.row]}</span> 배치 최선 (알까기 가능하나 불리) <span class="prob-tag">${pct(best.winProb)}</span> ${baselineNote}${mcNote}`;
   } else {
-    main.innerHTML = `추천: <span class="row-hl">${ROWS[best.row]}</span> 배치 &nbsp;${best.bonus || ''}`;
+    main.innerHTML = `추천: <span class="row-hl">${ROWS[best.row]}</span> 배치 ${best.bonus || ''} <span class="prob-tag">${pct(best.winProb)}</span> ${baselineNote}${mcNote}`;
   }
 
-  // Render option cards
   valid.forEach((opt, i) => {
     const div = document.createElement('div');
     let cls = 'rec-opt';
@@ -1305,18 +1512,15 @@ function doRecommend() {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'opt-row-name';
-
     const rowSpan = document.createElement('span');
     rowSpan.textContent = ROWS[opt.row];
     nameEl.appendChild(rowSpan);
-
     if (opt.type === 'alkkagi') {
       const tag = document.createElement('span');
       tag.className = 'alk-tag';
       tag.textContent = '⚡ 알까기';
       nameEl.appendChild(tag);
     }
-
     div.appendChild(nameEl);
 
     const detail = document.createElement('div');
@@ -1324,16 +1528,21 @@ function doRecommend() {
 
     if (opt.type === 'alkkagi') {
       const removed = opt.removedCount === 2 ? '더블 파괴' : opt.removedCount === 3 ? '트리플 파괴' : `${opt.removedCount}개 제거`;
-      const bonusEV = (opt.totalBenefit - opt.oppLoss).toFixed(1);
       detail.innerHTML =
         `상대 점수 손실: <strong>-${opt.oppLoss}점</strong> (${removed})<br>` +
-        `보너스 주사위 기대 가치: <strong>+${bonusEV}점</strong><br>` +
-        `총 이득: <strong>${opt.totalBenefit.toFixed(1)}점</strong> &nbsp;|&nbsp; 알까기 후 승리 줄: ${opt.winsAfter}개`;
+        `게임 승리 확률: <strong>${pct(opt.winProb)}</strong> <span class="prob-gain">(${gainStr(opt.winGain)})</span>`;
     } else {
+      const riskHTML = opt.riskNotes?.length
+        ? opt.riskNotes.map(n => `<span class="risk-note">${n}</span>`).join('')
+        : '';
+      const probLine = opt.rawWinProb !== undefined && Math.abs(opt.rawWinProb - opt.winProb) > 0.005
+        ? `게임 승리 확률: <strong>${pct(opt.winProb)}</strong> <span class="prob-gain">(${gainStr(opt.winGain)})</span> <span class="prob-raw">리스크 반영 전 ${pct(opt.rawWinProb)}</span>`
+        : `게임 승리 확률: <strong>${pct(opt.winProb)}</strong> <span class="prob-gain">(${gainStr(opt.winGain)})</span>`;
+      const rowWPPct = opt.rowWP !== undefined ? ` <span style="color:var(--text-dim);font-size:.78rem">(줄 승률 ${(opt.rowWP*100).toFixed(0)}%)</span>` : '';
       detail.innerHTML =
-        `내 점수 → <strong>${opt.newScore}</strong> &nbsp;|&nbsp; 상대: ${opt.oScore}<br>` +
-        `${opt.diff > 0 ? '✓ 우세' : opt.diff < 0 ? '✗ 열세' : '= 동점'}` +
-        `${opt.bonus ? ' &nbsp;|&nbsp; ' + opt.bonus : ''}`;
+        `내 점수 → <strong>${opt.newScore}</strong> &nbsp;|&nbsp; 상대: ${opt.oScore}${rowWPPct}<br>` +
+        `${opt.bonus || ''}<br>` +
+        probLine + riskHTML;
     }
     div.appendChild(detail);
 
@@ -1358,12 +1567,12 @@ function doRecommend() {
   // 타짜의 손놀림 분석
   if (state.hasTajja) {
     const tajja = calcSkillAnalysis(state.selectedDie);
-    const USE_THRESHOLD = 15;
+    const USE_THRESHOLD = 0.05; // 5%p 이상 기대 이득 시 사용 추천
     const shouldUse = tajja.expectedGain >= USE_THRESHOLD;
 
     const betterAlts = tajja.alternatives.filter(a => a.gain > 0).slice(0, 4);
     const altHTML = betterAlts.length
-      ? betterAlts.map(a => `<strong>${a.die}눈</strong>(+${Math.round(a.gain)}점)`).join(' &nbsp; ')
+      ? betterAlts.map(a => `<strong>${a.die}눈</strong>(${gainStr(a.gain)})`).join(' &nbsp; ')
       : '현재 주사위가 이미 최선';
 
     const tajjaDiv = document.createElement('div');
@@ -1373,7 +1582,7 @@ function doRecommend() {
          <span class="tajja-verdict ${shouldUse ? 'use' : 'save'}">${shouldUse ? '지금 사용 추천' : '아직 아끼세요'}</span>
        </div>
        <div class="tajja-detail">
-         기대 이득 <strong>${tajja.expectedGain.toFixed(1)}점</strong>
+         기대 이득 <strong>${(tajja.expectedGain * 100).toFixed(1)}%p</strong>
          &nbsp;|&nbsp; 유리한 눈: ${altHTML}
        </div>`;
     optsCon.appendChild(tajjaDiv);
@@ -1385,6 +1594,7 @@ function doRecommend() {
 // ─── RESET ────────────────────────────────────────────────────────────────
 function resetGame() {
   if (!confirm('게임을 리셋하시겠습니까?')) return;
+  _rwpCache.clear();
   state.playerRows    = [[], [], []];
   state.opponentRows  = [[], [], []];
   state.recommendedRow = null;
@@ -1393,7 +1603,7 @@ function resetGame() {
   state.isShield      = false;
   state.isOppShield   = false;
   state.turnCount     = 1;
-  state.currentTurn   = state.firstTurn || 'player';
+  state.currentTurn   = 'player';
   state.hasTajja      = true;
   exitBonusMode();
 
